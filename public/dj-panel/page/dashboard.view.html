@@ -1,0 +1,85 @@
+﻿
+    
+
+
+
+<div class="main-doc">
+
+
+        <div class="container">
+       <div class="row">
+       
+         <div class="col-lg-12 col-sm-12 col-xs-12">
+            <a href="javascript:void(0)" class="pull-right" ng-click="vm.logout()"><img src="log-out.png" class="logout_img img-responsive"></a>
+           
+            </div></div>
+            <div class="row">
+            <div class="col-sm-12">
+       <div class="inner-table">
+            <div class="col-lg-3 col-sm-3">
+           
+            </div>
+            <div class="col-lg-6 col-sm-6">
+            <h2><strong>Dj Panel</strong> </h2>
+            </div>
+           
+            </div> 
+            </div>
+           
+         
+         <div class="col-sm-12">
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>Date and Time</th>
+        <th>Request Id</th>
+        <th>Customer</th>
+        <th>Comment</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr ng-repeat="items in countDown_tick track by $index">
+
+        <td>{{items.date_and_time}}</td>
+        <td>{{items.request_id}}</td>
+        <td>{{items.user_name}}</td>
+         <td>{{items.comment}}</td>
+        
+       
+        <td>  
+
+
+
+
+            <button   ng-disabled="items.status=='Updating...'||items.status=='COMPLETED'"  class = "btn btn-success" style="background-color: {{items.status_color}};border-color: {{items.status_color}};" ng-click="vm.UpdateStatus(items)">{{items.status}}</button>
+
+          
+       </td>
+         
+      </tr>
+      <tr ng-show="!countDown_tick.length">
+        <td colspan="5">Do not have any new request</td>
+       
+      </tr>
+     
+    </tbody>
+  </table>
+</div>
+</div>
+       </div>
+        <script>
+          
+         
+            
+            
+
+
+          
+        </script>
+        
+        </div>
+
+
+
+       

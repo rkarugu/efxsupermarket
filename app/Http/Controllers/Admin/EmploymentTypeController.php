@@ -1,0 +1,241 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use DB;
+use Excel;
+use Session;
+use Exception;
+use Illuminate\Http\Request;
+use App\Models\EmploymentType;
+use App\Model\FdSeasonsAttribute;
+use App\Http\Controllers\Controller;
+
+class EmploymentTypeController extends Controller {
+    protected $model;
+    protected $title;
+    protected $pmodule;
+
+    public function __construct() {
+        $this->model = 'employment-type';
+        $this->title = 'Employment Type';
+        $this->pmodule = 'employment-type';
+        $this->pageUrl = 'employment-type';
+    }
+
+    public function index(Request $request) {
+        $title = $this->title;
+        $model = $this->model;
+        $pmodule = $this->pmodule;
+        $permission = $this->mypermissionsforAModule();
+
+        if (isset($permission[$pmodule . '___view']) || $permission == 'superadmin') {
+            $lists = FdSeasonsAttribute::orderBy('id', 'desc')->get();
+            $breadcum = [$title=>route($model.'.index'),'Listing'=>''];
+            return view('admin.EmploymentType.index',compact(
+                    'title','lists','model','breadcum','pmodule','permission'
+            ));
+        } else {
+            Session::flash('warning', 'Invalid Request');
+            return redirect()->back();
+        }
+    }
+
+
+    public function create(Request $request) {
+       $title =$this->title; 
+       $model = $this->model;
+       return view('admin.EmploymentType.create',compact('title','model'));  
+    }
+
+
+    public function store(Request $request){
+         try{
+               $row = new EmploymentType();
+                $row->type= $request->employment_type;
+                $row->description= $request->description;
+                $row->save();
+                Session::flash('success', 'Record added successfully.');
+                return redirect()->route($this->model.'.index');  
+        }
+        catch(\Exception $e){
+           $msg = $e->getMessage();
+           Session::flash('warning', $msg);
+           return redirect()->back()->withInput();
+        }
+    }
+
+    public function Datatables(Request $request) {
+        $permission =  $this->mypermissionsforAModule();
+        $pmodule = $this->pmodule;
+        $title = $this->title;
+        $model = $this->model;
+        $columns = [
+            'id', 'type', 'description'
+        ];
+        $limit = $request->input('length');
+        $start = $request->input('start');
+        $order = $columns[$request->input('order.0.column')];
+        $dir = $request->input('order.0.dir');
+
+        $data_query =  EmploymentType::select('wa_employment_types.*');
+    
+        if (!empty($request->input('search.value'))) {
+            $search = $request->input('search.value');
+            $data_query = $data_query->where(function($data_query) use ($search) {
+                $data_query->where('type', 'LIKE', "%{$search}%")
+                    ->orWhere('description', 'LIKE', "%{$search}%");
+                    
+            });
+            
+        }
+        $data_query_count = $data_query;
+        $totalFiltered = $data_query_count->count();
+        $data_query = $data_query->offset($start)
+            ->limit($limit)
+            ->orderBy($order, $dir)
+            ->get();
+        $data = array();
+        if (!empty($data_query)) {
+            foreach ($data_query as $key => $row) {                  
+                $user_link = '';
+                $nestedData['ID'] = $key + 1;
+                $nestedData['Type'] = $row->type;
+                $nestedData['Description'] = $row->description;
+                $nestedData['action'] =  "<span class='f-left margin-r-5'><a data-toggle='tooltip'  class='btn btn-primary small-btn' title='Edit' href='" . route('employment-type.edit',['id'=> $row->id])." '><i class='fa fa-pencil-square' aria-hidden='true'></i></a></span>
+                <form  action='" . route('employment-type.delete',['id'=> $row->id])." ' accept-charset='UTF-8' style='display:inline'><input name='_method' value='DELETE' type='hidden'>
+" . csrf_field() . "<span><button data-toggle='tooltip' title='Delete' type='submit' class='btn btn-danger small-btn'><i class='fa fa-trash' aria-hidden='true'></i></button></span></form>";
+          
+                $data[] = $nestedData;
+            }
+        
+        $json_data = array(
+            "draw" => intval($request->input('draw')),
+            "recordsFiltered" => intval($totalFiltered),
+            "data" => $data
+        );
+        echo json_encode($json_data);
+    }
+}
+
+  
+
+  public function Edit(Request $request,$editID){
+    $permission =  $this->mypermissionsforAModule();
+    $pmodule = $this->pmodule;
+    $title = $this->title;
+    $model = $this->model;
+    $row =  EmploymentType::where('id',$editID)->first();
+    return view('admin.EmploymentType.edit',compact('title','model','row'));
+  }
+
+  public function update(Request $request,$updata){
+    $upDate =  EmploymentType::where('id',$updata)->first();
+ try{
+                $upDate->type= $request->employment_type;
+                $upDate->description= $request->description;
+                $upDate->save();
+                Session::flash('success', 'Record updated successfully.');
+                return redirect()->route($this->model.'.index');  
+        }
+        catch(\Exception $e){
+           $msg = $e->getMessage();
+           Session::flash('warning', $msg);
+           return redirect()->back()->withInput();
+        }
+  }
+
+
+   public function delete($slug)
+    {
+        try
+        {
+            EmploymentType::where('id',$slug)->delete();
+            Session::flash('success', 'Deleted successfully.');
+            return redirect()->back();
+        }
+        catch(\Exception $e)
+        {
+            Session::flash('warning','Invalid Request');
+            return redirect()->back();
+        }
+    }
+
+    // API
+    public function employmentTypeList()
+    {
+        $employmentTypes = EmploymentType::withCount('employees')->orderBy('name')->get();
+        
+        return response()->json($employmentTypes);
+    }
+
+    public function employmentTypeCreate(Request $request)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string'
+        ]);
+
+        try {
+            $employmentType = EmploymentType::create($data);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Employment Type added successfully',
+            'data' => $employmentType
+        ], 201);
+    }
+
+    public function employmentTypeEdit(Request $request)
+    {
+        $request->validate([
+            'id' => 'required|exists:employment_types,id',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string'
+        ]);
+
+        try {
+            $employmentType = EmploymentType::find($request->id);
+
+            $employmentType->update([
+                'name' => $request->name,
+                'description' => $request->description,
+            ]);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Employment Type updated successfully',
+            'data' => $employmentType
+        ]);
+    }
+
+    public function employmentTypeDelete($id)
+    {
+        request()->validate([
+            'id' => 'exists:employment_types,id'
+        ]);
+        
+        $employmentType = EmploymentType::find($id);
+        
+        try {
+            $employmentType->delete();
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Employment Type deleted successfully',
+        ]);
+    }
+}

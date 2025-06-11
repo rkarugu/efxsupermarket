@@ -1,0 +1,1 @@
+Non-static method Illuminate\Http\Request::all() should not be called statically

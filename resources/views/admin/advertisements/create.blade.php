@@ -1,0 +1,65 @@
+
+@extends('layouts.admin.admin')
+@section('content')
+<section class="content">    
+    <div class="box box-primary">
+        <div class="box-header with-border"><h3 class="box-title"> {!! $title !!} </h3></div>
+         @include('message')
+        <form class="validate form-horizontal"  role="form" method="POST" action="{{ route($model.'.store') }}" enctype = "multipart/form-data">
+            {{ csrf_field() }}
+            <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-2 control-label">Title</label>
+                    <div class="col-sm-10">
+                        {!! Form::text('title', null, ['maxlength'=>'255','placeholder' => 'Title', 'required'=>true, 'class'=>'form-control']) !!}  
+                    </div>
+                </div>
+            </div>
+
+              <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-2 control-label">Display Order</label>
+                    <div class="col-sm-10">
+                    {!!Form::select('display_order',array_combine(range(1,100), range(1,100)), null, ['placeholder'=>'Select display order ', 'class' => 'form-control','required'=>true,'title'=>'Please display order'  ])!!}
+                        
+                    </div>
+                </div>
+            </div>
+
+            
+           
+             <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-2 control-label">Image</label>
+                    <div class="col-sm-10">
+                        <input type = "file" name = "image"  required accept="image/*" >
+                    </div>
+                </div>
+            </div>
+
+
+            
+           
+             
+
+
+            <div class="box-footer">
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </div>
+        </form>
+    </div>
+</section>
+@endsection
+
+@section('uniquepagestyle')
+
+@endsection
+
+@section('uniquepagescript')
+
+
+
+
+@endsection
+
+

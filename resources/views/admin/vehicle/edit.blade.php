@@ -1,0 +1,262 @@
+@extends('layouts.admin.admin')
+@section('content')
+
+  <section class="content">
+    <div class="box box-primary">
+      <div class="box-header with-border"><h3 class="box-title"> {!! $title !!} </h3></div>
+      <!--  @include('message')
+      <form class="validate form-horizontal"  role="form" method="Post"
+      action="{{ route($model.'.update',['id'=>$row->id]) }}" enctype = "multipart/form-data"> -->
+
+      @include('message')
+      {!! Form::model($row, ['method' => 'PATCH','route' => [$model.'.update', $row->id],'class'=>'validate form-horizontal','enctype'=>'multipart/form-data']) !!}
+
+      {{ csrf_field() }}
+      <div class="box-body">
+        <!-- <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-2 control-label">Vehicle Name</label>
+                    <div class="col-sm-10">
+                        {!! Form::text('vehicle_name', $row->vehicle_name, ['maxlength'=>'255','placeholder' => 'Vehicle Name', 'required'=>true, 'class'=>'form-control']) !!}
+        </div>
+    </div> -->
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Acquisition Date</label>
+          <div class="col-sm-10">
+            {!! Form::date('acquisition_date', $row->acquisition_date, ['maxlength'=>'255','placeholder' => 'Vehicle Name', 'required'=>true, 'class'=>'form-control']) !!}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Vin Sn</label>
+          <div class="col-sm-10">
+            {!! Form::text('vin_sn', $row->vin_sn, ['maxlength'=>'255','placeholder' => 'Vin Sn', 'required'=>true, 'class'=>'form-control']) !!}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">License Plate</label>
+          <div class="col-sm-10">
+            {!! Form::textarea('license_plate',$row->license_plate,['rows' => 1, 'cols' => 40,'maxlength'=>'255','placeholder' => 'license_plate', 'required'=>true, 'class'=>'form-control']) !!}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Type</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="type" required="true">
+              <option value="">Select Type</option>
+              <?php
+              foreach ($vehicle as $vehicle){
+                $selected = $row->type == $vehicle->id ? 'selected' : ''; ?>
+              <option value="{{ $vehicle->id }}" {{$selected}}>
+                {{ $vehicle->title }}</option>
+              <?php } ?>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Year</label>
+          <div class="col-sm-10">
+            {!! Form::textarea('year',$row->year,['rows' => 1, 'cols' => 40,'maxlength'=>'255','placeholder' => 'Year', 'required'=>true, 'class'=>'form-control']) !!}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Make</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="make" required="true">
+              <option value="">Select Type</option>
+              <?php
+              foreach ($make as $make){
+                $selected = $row->make == $make->id ? 'selected' : ''; ?>
+              <option value="{{ $make->id }}" {{$selected}}>
+                {{ $make->title }}</option>
+              <?php } ?>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Model</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="model" required="true">
+              <option value="">Select Model</option>
+              <?php
+              foreach ($modal as $mode){
+                $selected = $row->model == $mode->id ? 'selected' : ''; ?>
+              <option value="{{ $mode->id }}" {{$selected}}>
+                {{ $mode->title }}</option>
+              <?php } ?>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Trim</label>
+          <div class="col-sm-10">
+            {!! Form::textarea('trim',$row->trim,['rows' => 1, 'cols' => 40,'maxlength'=>'255','placeholder' => 'Trim', 'required'=>true, 'class'=>'form-control']) !!}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Registration state provine</label>
+          <div class="col-sm-10">
+            {!! Form::text('registration_state_provine', $row->registration_state_provine, ['maxlength'=>'255','placeholder' => 'Registration state provine', 'required'=>true, 'class'=>'form-control']) !!}
+          </div>
+        </div>
+
+        {{-- <div class="form-group">
+            <label for="inputEmail3" class="col-sm-2 control-label">Photo</label>
+            <div class="col-sm-10">
+                {!! Form::file('photo', $row->photo, ['maxlength'=>'255','placeholder' => 'Photo', 'required'=>true, 'class'=>'form-control']) !!}
+            </div>
+        </div>   --}}
+
+        <div class="form-group">
+          <div><label for="inputEmail3" class="col-sm-2 control-label">Photo</label>
+            <div class="col-sm-10">
+              <input type="file" class="form-control" id="inputEmail3" name="photo">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Status</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="status" required="true">
+              <option value="" selected disabled>Select Status</option>
+              <option value="active" <?php if (($row->status) == "active") {
+                echo "selected";
+              } ?>>Active
+              </option>
+              <option value="inactive" <?php if (($row->status) == "inactive") {
+                echo "selected";
+              } ?>>Inactive
+              </option>
+
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Group</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="group" required="true">
+              <option value="">Select Group</option>
+              <option value="active" <?php if (($row->group) == "active") {
+                echo "selected";
+              } ?>>Active
+              </option>
+              <option value="inactive" <?php if (($row->group) == "inactive") {
+                echo "selected";
+              } ?>>Inactive
+              </option>
+
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Operator</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="operator" required="true">
+              <option value="">Select Operator</option>
+              <option value="active" <?php if (($row->operator) == "active") {
+                echo "selected";
+              } ?>>Active
+              </option>
+              <option value="inactive" <?php if (($row->operator) == "inactive") {
+                echo "selected";
+              } ?>>Inactive
+              </option>
+
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Ownership</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="ownership" required="true">
+              <option value="">Select Ownership</option>
+              <option value="active" <?php if (($row->ownership) == "active") {
+                echo "selected";
+              } ?>>Active
+              </option>
+              <option value="inactive" <?php if (($row->ownership) == "inactive") {
+                echo "selected";
+              } ?>>Inactive
+              </option>
+
+
+            </select>
+          </div>
+        </div>
+
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Color</label>
+          <div class="col-sm-10">
+            {!! Form::text('color', $row->color, ['maxlength'=>'255','placeholder' => 'Color', 'required'=>true, 'class'=>'form-control']) !!}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Body Type</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="bodytype" required="true">
+              <option value="">Select BodyType</option>
+              <?php
+              foreach ($bodytype as $bodytype){
+                $selected = $row->body_type == $bodytype->id ? 'selected' : ''; ?>
+              <option value="{{ $bodytype->id }}" {{$selected}} >
+                {{ $bodytype->title }}</option>
+              <?php } ?>
+            </select>
+          </div>
+        </div>
+
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">MSRP</label>
+          <div class="col-sm-10">
+            {!! Form::text('msrp', $row->msrp, ['maxlength'=>'255','placeholder' => 'msrp', 'required'=>true, 'class'=>'form-control']) !!}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="inputEmail3" class="col-sm-2 control-label">Linked Devices</label>
+          <div class="col-sm-10">
+            <select class="form-control m-bot15" name="linked_devices" required="true">
+              <option value="{{$row->linked_devices}}">Select Linked Devices</option>
+              <option value="active" <?php if (($row->linked_devices) == "active") {
+                echo "selected";
+              } ?>>Active
+              </option>
+              <option value="inactive" <?php if (($row->linked_devices) == "inactive") {
+                echo "selected";
+              } ?>>Inactive
+              </option>
+            </select>
+          </div>
+        </div>
+
+
+      </div>
+
+      <div class="form-group">
+        <label for="device" class="col-sm-2 control-label">Telematics Device</label>
+        <div class="col-sm-10">
+          <select class="form-control m-bot15" name="device" required="true">
+            <option value="" selected disabled>Please Select</option>
+            @foreach($devices as $device)
+              <option value="{{ $device["id"] }}" {{ $row->device_id == $device["id"] ? 'selected' : '' }}>{{ $device["name"] }}</option>
+            @endforeach
+          </select>
+        </div>
+      </div>
+      <div class="box-footer">
+        <button type="submit" class="btn btn-primary">Update</button>
+      </div>
+      </form>
+    </div>
+  </section>
+@endsection
+
+
+

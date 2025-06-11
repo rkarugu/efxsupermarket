@@ -1,0 +1,633 @@
+// from fleet management sidebar
+@if ($logged_user_info->role_id == 1 || isset($my_permissions['vehicle___view']))
+                            <li class="treeview @if (isset($model) &&
+                                    ($model == 'supplier-aging-analysis' ||
+                                        $model == 'vehicle' ||
+                                        $model == 'meterhistory' ||
+                                        $model == 'expensehistory' ||
+                                        $model == 'vehicle-assigement' ||
+                                        $model == 'make' ||
+                                        $model == 'vehicle' ||
+                                        $model == 'vehicletype' ||
+                                        $model == 'model' ||
+                                        $model == 'bodytype' ||
+                                        $model == 'expensetype' ||
+                                        $model == 'vehicletype' ||
+                                        $model == 'profit-ability-summary' ||
+                                        $model == 'meterhistory' ||
+                                        $model == 'expensehistory' ||
+                                        $model == 'replacement-analysis')) active @endif">
+                                <a href="#"><i class="fa fa-car"></i><span> Vehicle</span>
+                                    <span class="pull-right-container">
+                                        <i class="fa fa-angle-left pull-right"></i>
+                                    </span>
+                                </a>
+                                <ul class="treeview-menu">
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['vehicle___view']))
+
+                                        <li class="@if (isset($model) && $model == 'vehicle') active @endif"><a
+                                                    href="{!! route('vehicle.index') !!}"><i class="fa fa-circle-o"></i>
+                                                Vehicle List</a></li>
+                                        <!-- <li class= "@if (isset($model) && $model == 'vehicletype')
+                                            active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                        @endif"><a href="vehicletype"><i class="fa fa-circle-o"></i> Vehicle Type</a></li> -->
+
+                                    @endif
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['vehicle___view']))
+
+                                        <li class="@if(isset($model) && $model == 'vehicleassigement') active @endif"><a href="{{route('vehicleassignment.index')}}"><i class="fa fa-circle-o"></i>
+                                                Vehicle Assignment</a></li>
+                                    @endif
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['meterhistory___view']))
+
+                                        <li class="@if (isset($model) && $model == 'meterhistory') active @endif"><a
+                                                    href="{!! route('meterhistory.index') !!}"><i class="fa fa-circle-o"></i> Meter
+                                                History</a></li>
+                                    @endif
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['expensehistory___view']))
+
+                                        <li class="@if (isset($model) && $model == 'expensehistory') active @endif"><a
+                                                    href="{!! route('expensehistory.index') !!}"><i class="fa fa-circle-o"></i>
+                                                Expense History</a>
+                                        </li>
+                                    @endif
+
+
+                                    <li class="treeview @if (isset($model) &&
+                                            ($model == 'supplier-aging-analysis' ||
+                                                $model == 'vehicletype' ||
+                                                $model == 'make' ||
+                                                $model == 'vehicletype' ||
+                                                $model == 'model' ||
+                                                $model == 'bodytype' ||
+                                                $model == 'expensetype' ||
+                                                $model == 'model' ||
+                                                $model == 'expensetype' ||
+                                                $model == 'schedules' ||
+                                                $model == 'forms')) active @endif">
+
+                                        <a href="#"><i class="fa fa-cog" aria-hidden="true"></i><span>Vehicle
+                                                Setup</span>
+                                            <span class="pull-right-container">
+                                                <i class="fa fa-angle-left pull-right"></i>
+                                            </span>
+                                        </a>
+                                        <ul class="treeview-menu">
+                                            @if ($logged_user_info->role_id == 1 || isset($my_permissions['vehicletype___view']))
+
+                                                <li class="@if (isset($model) && $model == 'vehicletype') active @endif"><a
+                                                            href="{!! route('vehicletype.index') !!}"><i
+                                                                class="fa fa-circle-o"></i> Vehicle Type</a>
+                                                </li>
+                                            @endif
+                                            @if ($logged_user_info->role_id == 1 || isset($my_permissions['make___view']))
+                                                <li class="@if (isset($model) && $model == 'make') active @endif"><a
+                                                            href="{!! route('make.index') !!}"><i
+                                                                class="fa fa-circle-o"></i> Make</a></li>
+                                            @endif
+                                            @if ($logged_user_info->role_id == 1 || isset($my_permissions['model___view']))
+
+                                                <li class="@if (isset($model) && $model == 'model') active @endif"><a
+                                                            href="{!! route('model.index') !!}"><i
+                                                                class="fa fa-circle-o"></i>Model</a></li>
+                                            @endif
+
+                                            @if ($logged_user_info->role_id == 1 || isset($my_permissions['bodytype___view']))
+
+                                                <li class="@if (isset($model) && $model == 'bodytype') active @endif"><a
+                                                            href="{!! route('bodytype.index') !!}"><i
+                                                                class="fa fa-circle-o"></i> Body Type</a></li>
+                                            @endif
+
+                                            @if ($logged_user_info->role_id == 1 || isset($my_permissions['expensetype___view']))
+
+                                                <li class="@if (isset($model) && $model == 'expensetype') active @endif"><a
+                                                            href="{!! route('expensetype.index') !!}"><i
+                                                                class="fa fa-circle-o"></i> Expense Type</a>
+                                                </li>
+                                            @endif
+
+                                            <!--  <li class= "@if (isset($model) && $model == 'forms')
+                                                active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                            @endif"><a href="#"><i class="fa fa-circle-o"></i> Forms</a></li> -->
+                                        </ul>
+                                    </li>
+                                    @if (
+                                        $logged_user_info->role_id == 1 ||
+                                            isset(
+                                                $my_permissions[
+                                                    'profit-ability-summary
+                                                                         ___view'
+                                                ]))
+
+                                        <li class="@if (isset($model) && $model == 'profit-ability-summary') active @endif"><a
+                                                    href="{!! route('profit-ability-summary.index') !!}"><i class="fa fa-circle-o"></i>
+                                                Profitablity
+                                                Summary</a></li>
+                                    @endif
+
+                                    <!--  <li class= "@if (isset($model) && $model == 'replacement-analysis')
+                                        active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                    @endif"><a href="#"><i class="fa fa-circle-o"></i> Replacement analysis</a></li> -->
+                                </ul>
+                            </li>
+
+                        @endif
+
+                          @if ($logged_user_info->role_id == 1 || isset($my_permissions['setup___view']))
+                            <li class="treeview @if (isset($model) &&
+                                    ($model == 'supplier-aging-analysis' ||
+                                        $model == 'vehicletype' ||
+                                        $model == 'make' ||
+                                        $model == 'model' ||
+                                        $model == 'schedules' ||
+                                        $model == 'forms'))
+                                active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                            @endif">
+                <a href="#"><i class="fa fa-cog" aria-hidden="true"></i><span> Set Up</span>
+                <span class="pull-right-container">
+                <i class="fa fa-angle-left pull-right"></i>
+                </span>
+                </a>
+                  <ul class="treeview-menu">
+                    <li class= "@if (isset($model) && $model == 'vehicletype')
+                                active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                            @endif"><a href="vehicletype"><i class="fa fa-circle-o"></i> Vehicle Type</a></li>
+
+                <li class= "@if (isset($model) && $model == 'make')
+                                active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                            @endif"><a href="{!! route('make.index') !!}"><i class="fa fa-circle-o"></i> Make</a></li>
+                <li class= "@if (isset($model) && $model == 'model')
+                                active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                            @endif"><a href="#"><i class="fa fa-circle-o"></i>Model</a></li>
+                <li class= "@if (isset($model) && $model == 'bodytype')
+                                active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                            @endif"><a href="#"><i class="fa fa-circle-o"></i> Body Type</a></li>
+                <li class= "@if (isset($model) && $model == 'forms')
+                                active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                            @endif"><a href="#"><i class="fa fa-circle-o"></i> Forms</a></li>
+                </ul>
+                </li>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                        @endif
+
+                        @if (
+                            $logged_user_info->role_id == 1 ||
+                                isset($my_permissions['inspection_history___view']) ||
+                                isset($my_permissions['inspection_forms___view']))
+                            <li class="treeview @if (isset($model) &&
+                                    ($model == 'supplier-aging-analysis' ||
+                                        $model == 'inspection_history' ||
+                                        $model == 'inspection_history' ||
+                                        $model == 'item-failures' ||
+                                        $model == 'schedules' ||
+                                        $model == 'inspection_forms')) active @endif">
+                                <a href="#"><i class="fa fa-check" aria-hidden="true
+                  "
+                                               aria-hidden="true"></i><span> Inspections</span>
+                                    <span class="pull-right-container">
+                                        <i class="fa fa-angle-left pull-right"></i>
+                                    </span>
+                                </a>
+                                <ul class="treeview-menu">
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['inspection_history___view']))
+
+                                        <li class="@if (isset($model) && $model == 'inspection_history') active @endif"><a
+                                                    href="{{ route('inspection_history.index') }}"><i
+                                                        class="fa fa-circle-o"></i> Inspections
+                                                History</a></li>
+                                    @endif
+
+                                    <li class="@if (isset($model) && $model == 'item-failures') active @endif"><a
+                                                href="#"><i class="fa fa-circle-o"></i>Item Failures</a></li>
+
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['inspection_forms___view']))
+                                        <li class="@if (isset($model) && $model == 'inspection_forms') active @endif"><a
+                                                    href="{{ route('inspection_forms.index') }}"><i
+                                                        class="fa fa-circle-o"></i> Forms</a></li>
+                                    @endif
+
+                                </ul>
+                            </li>
+
+                        @endif
+
+                        @if ($logged_user_info->role_id == 1 || isset($my_permissions['issues___view']))
+                            <li class="treeview @if (isset($model) &&
+                                    ($model == 'supplier-aging-analysis' || $model == 'issues' || $model == 'Faults' || $model == 'recalls')) active @endif">
+                                <a href="#"><i class="fa fa-question-circle" aria-hidden="true"></i><span>
+                                        Issues</span>
+                                    <span class="pull-right-container">
+                                        <i class="fa fa-angle-left pull-right"></i>
+                                    </span>
+                                </a>
+                                <ul class="treeview-menu">
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['issues___view']))
+
+                                        <li class="@if (isset($model) && $model == 'issues') active @endif"><a
+                                                    href="{!! route('issues.index') !!}"><i class="fa fa-circle-o"></i>
+                                                Issues</a></li>
+                                    @endif
+
+
+                                </ul>
+                            </li>
+
+                        @endif
+
+                        @if ($logged_user_info->role_id == 1 || isset($my_permissions['service_remainder___view']))
+                            <li class="treeview @if (isset($model) &&
+                                    ($model == 'supplier-aging-analysis' ||
+                                        $model == 'service_remainder' ||
+                                        $model == 'vehicle-renewal' ||
+                                        $model == 'contact-renewal')) active @endif">
+                                <a href="#"><i class="fa fa-bell" aria-hidden="true"></i><span>
+                                        Remainder</span>
+                                    <span class="pull-right-container">
+                                        <i class="fa fa-angle-left pull-right"></i>
+                                    </span>
+                                </a>
+                                <ul class="treeview-menu">
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['service_remainder___view']))
+                                        <li class="@if (isset($model) && $model == 'service_remainder') active @endif"><a
+                                                    href="{{ route('service_remainder.index') }}"><i
+                                                        class="fa fa-circle-o"></i> Service Remainder</a>
+                                        </li>
+                                    @endif
+
+                                </ul>
+                            </li>
+
+                        @endif
+
+                        @if (
+                            $logged_user_info->role_id == 1 ||
+                                isset($my_permissions['servicetask___view']) ||
+                                isset($my_permissions['servicehistory___view']))
+
+                            <li class="treeview @if (isset($model) &&
+                                    ($model == 'supplier-aging-analysis' ||
+                                        $model == 'servicehistory' ||
+                                        $model == 'work-order' ||
+                                        $model == 'servicetask' ||
+                                        $model == 'service-programs' ||
+                                        $model == 'shop-directory' ||
+                                        $model == 'shop-integration')) active @endif">
+                                <a href="#"><i class="fa fa-wrench" aria-hidden="true"></i><span>
+                                        Service</span>
+                                    <span class="pull-right-container">
+                                        <i class="fa fa-angle-left pull-right"></i>
+                                    </span>
+                                </a>
+
+                                <ul class="treeview-menu">
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['servicehistory___view']))
+                                        <li class="@if (isset($model) && $model == 'servicehistory') active @endif"><a
+                                                    href="{!! route('servicehistory.index') !!}"><i class="fa fa-circle-o"></i>
+                                                Service History</a>
+                                        </li>
+                                    @endif
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['servicetask___view']))
+                                        <li class="@if (isset($model) && $model == 'servicetask') active @endif"><a
+                                                    href="{!! route('servicetask.index') !!}"><i class="fa fa-circle-o"></i>
+                                                Service Tasks</a></li>
+                                    @endif
+                                </ul>
+                            </li>
+                        @endif
+
+
+                        @if (
+                            $logged_user_info->role_id == 1 ||
+                                isset($my_permissions['tyre_inventories___view']) ||
+                                isset($my_permissions['tyre_inventories___view']) ||
+                                isset($my_permissions['tyre-purchase-orders___view']) ||
+                                isset($my_permissions['tyre-approve-lpo___view']) ||
+                                isset($my_permissions['tyre-purchase-orders___archived-lpo']) ||
+                                isset($my_permissions['receive-tyre-purchase-order___view']) ||
+                                isset($my_permissions['tyre-completed-grn___view']) ||
+                                isset($my_permissions['tyreposition___view']) ||
+                                isset($my_permissions['tyre_fitting___view']) ||
+                                isset($my_permissions['tyre_removal___view']) ||
+                                isset($my_permissions['send_tyre_retreading___view']) ||
+                                isset($my_permissions['receive_send_tyre_retreading']) ||
+                                isset($my_permissions['tyre_transfer']))
+                            <li class="treeview @if (isset($model) &&
+                                    ($model == 'tyre_inventories' ||
+                                        $model == 'tyre-purchase' ||
+                                        $model == 'factory-fitted' ||
+                                        $model == 'tyre-fitting' ||
+                                        $model == 'tyre_removal' ||
+                                        $model == 'tyre-removal' ||
+                                        $model == 'tyreposition' ||
+                                        $model == 'tyre-retreading' ||
+                                        $model == 'tyre-purchase-orders' ||
+                                        $model == 'tyre_transfer' ||
+                                        $model == 'send_tyre_retreading' ||
+                                        $model == 'receive-tyre-purchase-order' ||
+                                        $model == 'receive_send_tyre_retreading' ||
+                                        $model == 'tyre-transfer' ||
+                                        $model == 'tyre-approve-lpo' ||
+                                        $model == 'tyre_fitting' ||
+                                        $model == 'tyre-inspection' ||
+                                        $model == 'tyre-tracking-history')) active @endif">
+                                <a href="#">
+                                    <img style="width: 9%; position: relative; top: -1px; left: -3px;"
+                                         src="{{ URL::to('storage/app/public/wheel.svg') }}">
+                                    <span> Tyre Management</span>
+                                    <span class="pull-right-container">
+                                        <i class="fa fa-angle-left pull-right"></i>
+                                    </span>
+                                </a>
+
+                                <ul class="treeview-menu">
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre_inventories___view']))
+
+                                        <li class="@if (isset($model) && $model == 'tyre_inventories') active @endif"><a
+                                                    href="{{ route('tyre_inventories.index') }}"><i
+                                                        class="fa fa-circle-o"></i> Tyre Inventory List</a>
+                                        </li>
+
+                                    @endif
+
+                                    @if (
+                                        $logged_user_info->role_id == 1 ||
+                                            isset($my_permissions['tyre-purchase-orders___view']) ||
+                                            isset($my_permissions['tyre-approve-lpo___view']) ||
+                                            isset($my_permissions['tyre-purchase-orders___archived-lpo']))
+                                        <li class="treeview @if (isset($model) &&
+                                                ($model == 'non-stock-purchase-orders' || $model == 'tyre-purchase-orders' || $model == 'tyre-approve-lpo')) active @endif">
+                                            <a href="#"><i class="fa fa-share"></i> Tyre Purchase Orders
+                                                <span class="pull-right-container">
+                                                    <i class="fa fa-angle-left pull-right"></i>
+                                                </span>
+                                            </a>
+                                            <ul class="treeview-menu">
+                                                @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre-purchase-orders___view']))
+                                                    <li class="@if (isset($model) && $model == 'tyre-purchase-orders') active @endif"><a
+                                                                href="{!! route('tyre-purchase-orders.index') !!}"><i
+                                                                    class="fa fa-circle-o"></i> New
+                                                            Purchase Order</a></li>
+                                                @endif
+                                                @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre-approve-lpo___view']))
+                                                    <li class="@if (isset($model) && $model == 'tyre-approve-lpo') active @endif"><a
+                                                                href="{!! route('tyre-approve-lpo.index') !!}"><i
+                                                                    class="fa fa-circle-o"></i> Approve
+                                                            LPO</a></li>
+                                                @endif
+                                                @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre-purchase-orders___archived-lpo']))
+                                                    <li class="@if (isset($models) && $models == 'tyre-archived-lpo') active @endif"><a
+                                                                href="{!! route('tyre-purchase-orders.archived-lpo') !!}"><i
+                                                                    class="fa fa-circle-o"></i> Archived LPO's</a></li>
+                                                @endif
+
+                                            </ul>
+                                        </li>
+                                    @endif
+
+
+                                    @if (
+                                        $logged_user_info->role_id == 1 ||
+                                            isset($my_permissions['receive-tyre-purchase-order___view']) ||
+                                            isset($my_permissions['tyre-completed-grn___view']))
+                                        <li class="treeview @if ((isset($model) && $model == 'receive-tyre-purchase-order') || $model == 'tyre-completed-grn') ) active @endif">
+                                            <a href="#"><i class="fa fa-share"></i> Receive Tyre Orders
+                                                <span class="pull-right-container">
+                                                    <i class="fa fa-angle-left pull-right"></i>
+                                                </span>
+                                            </a>
+                                            <ul class="treeview-menu">
+                                                @if ($logged_user_info->role_id == 1 || isset($my_permissions['receive-tyre-purchase-order___view']))
+                                                    <li class="@if (isset($model) && $model == 'receive-tyre-purchase-order') active @endif"><a
+                                                                href="{!! route('receive-tyre-purchase-order.index') !!}"><i
+                                                                    class="fa fa-circle-o"></i> Receive Tyre Order</a></li>
+                                                @endif
+                                                @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre-completed-grn___view']))
+                                                    <li class="@if (isset($model) && $model == 'tyre-completed-grn') active @endif"><a
+                                                                href="{!! route('completed-grn.index') !!}"><i
+                                                                    class="fa fa-circle-o"></i> Completed
+                                                            GRN</a></li>
+                                                @endif
+                                            </ul>
+                                        </li>
+                                    @endif
+
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyreposition___view']))
+                                        <li class="@if (isset($model) && $model == 'tyreposition') active @endif"><a
+                                                    href="{{ route('tyreposition.index') }}"><i
+                                                        class="fa fa-circle-o"></i> Tyre Positions</a></li>
+                                    @endif
+
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre_fitting___view']))
+                                        <li class="@if (isset($model) && $model == 'tyre_fitting') active @endif"><a
+                                                    href="{{ route('tyre_fitting.create') }}"><i
+                                                        class="fa fa-circle-o"></i> Tyre Fitting</a></li>
+                                    @endif
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre_removal___view']))
+                                        <li class="@if (isset($model) && $model == 'tyre_removal') active @endif"><a
+                                                    href="{{ route('tyre_removal.create') }}"><i
+                                                        class="fa fa-circle-o"></i> Tyre Removal</a></li>
+                                    @endif
+
+
+
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre_retreading___view']))
+
+                                        <li class="treeview @if (isset($model) && ($model == 'send_tyre_retreading' || $model == 'receive_send_tyre_retreading')) ) active @endif">
+                                            <a href="#"><i class="fa fa-share"></i> Tyre Retreading
+                                                <span class="pull-right-container">
+                                                    <i class="fa fa-angle-left pull-right"></i>
+                                                </span>
+                                            </a>
+                                            <ul class="treeview-menu">
+                                                @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre_retreading___view']))
+                                                    <li class="@if (isset($model) && $model == 'send_tyre_retreading') active @endif"><a
+                                                                href="{!! route('tyre_retreading.create') !!}"><i
+                                                                    class="fa fa-circle-o"></i> Send Tyre
+                                                            to Retread</a></li>
+                                                @endif
+                                                @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre_retreading___add']))
+                                                    <li class="@if (isset($model) && $model == 'receive_send_tyre_retreading') active @endif"><a
+                                                                href="{!! route('tyre_retreading.receive_retread_tyres') !!}"><i
+                                                                    class="fa fa-circle-o"></i> Receive Tyre to Retread</a>
+                                                    </li>
+                                                @endif
+                                            </ul>
+                                        </li>
+
+
+                                        {{--
+                                         <li class="@if (isset($model) && $model == 'send_tyre_retreading') active @endif"><a href="{{route('send_tyre_retreading.create')}}"><i class="fa fa-circle-o"></i> Tyre Retreading</a></li> --}}
+                                    @endif
+
+                                    @if ($logged_user_info->role_id == 1 || isset($my_permissions['tyre_transfer___view']))
+
+                                        <li class="@if (isset($model) && $model == 'tyre_transfer') active @endif"><a
+                                                    href="{{ route('tyre_transfer.create') }}"><i
+                                                        class="fa fa-circle-o"></i> Tyre Transfer</a></li>
+                                    @endif
+
+
+                                </ul>
+                            </li>
+                        @endif

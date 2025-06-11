@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Model\WaDebtorTran;
+use App\Services\ExcelDownloadService;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
+
+class BankReconciliationController extends Controller
+{
+    protected string $model = 'bank-reconciliation';
+    protected string $permission_module = 'bank-reconciliation';
+    protected string $base_folder = 'admin.bank_reconciliation';
+    protected string $base_route = 'bank-reconciliation';
+
+    protected float $systemTotal = 0;
+    protected int $systemCount = 0;
+
+    protected float $bankCount = 0;
+    protected float $bankTotal = 0;
+
+    protected array $reconciledTransactions = [];

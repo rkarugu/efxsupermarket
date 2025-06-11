@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+
+<style>
+table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 10px !important;
+  border:0px;
+
+}
+
+
+td, th {
+  text-align: left;
+  padding: 8px;
+  border:0px;
+}
+
+tr th{
+  border-bottom: 1px solid #dddddd;
+}
+tr:nth-child(even) th, tr:nth-child(even) td{
+  background-color: #eeeeee;
+}
+</style>
+</head>
+<body>
+   @php 
+	   $totalamount = []; //echo "<pre>"; print_r($depoitelist); die; 	                                   
+	   $paymentmethodtotal = []; //echo "<pre>"; print_r($depoitelist); die; 	                                   
+    @endphp
+     @foreach($mydebtorlist as $key=> $val)
+    @php $totalamount[] = abs($val->balance);  @endphp
+     @endforeach
+
+     @foreach($depoitelist as $key=> $val)
+    @php $paymentmethodtotal[] = abs($val->amount);  @endphp
+     @endforeach
+
+<div style="width: 90%;margin:auto;font-size: 12px; ">
+                       
+                            
+							@php
+						       $account_codes =  getChartOfAccountsList();
+						       $totalexp = 0;
+							 @endphp
+
+ 							   @foreach($expenseList as $val)
+							   	@php 
+								   	$totalexp += $val->amount;
+							   	 @endphp
+							   	@endforeach
+
+                           <div class="col-sm-12 no-padding-h">
+	                           <div class="col-sm-12 no-padding-h">
+							   		<center><h2>Shift Summary Report</h2>
+							   		<h2>Route : {{isset($shiftdata->route)?$shiftdata->route:'-------' }}</h2>
+							   		</center>
+                           <div class="col-sm-12">
+	                           <div class="col-sm-8">
+
+	                           </div> 
+	                           <div class="col-sm-4" style="float: right;width: 25%; text-align: right; padding-top: 10px;">
+							   	<div style="">
+								   	<b>Date : {{date('d m, Y h:i A')}}</b>
+							   	</div>
+							   	
+	                           </div> 
+
+
+                           </div> 
+
+							   		<h4 style="border-top:1px solid; padding:10px 0px;">Salesman Name :@if(isset($salesmanname)) {{ $salesmanname}} @endif </h4>
+		                           <h4>Shift Name : {{(isset($shiftData) && count($shiftData) >0) ? implode(",",$shiftData) : '.................' }}</h4>
+ 	                           </div> 
+ 	                         
+
+                           </div> 
+                           <div class="col-sm-12">
+	                           <div class="col-sm-8">
+
+	                           </div> 
+	                           <div class="col-sm-4" style="float: right;width: 10%;">
+							   	<b>Amount</b><br>
+							   	<div style="border-top:1px solid; border-bottom:1px solid;">
+                    {{manageAmountFormat(abs($totalAmnt))}}
+							   	</div>
+							   	
+	                           </div> 
+
+
+                           </div> 
+
+                           <div class="col-sm-12">
+	                           <div class="col-sm-8">
+							   <b>EXPENSES</b><br>
+							   @foreach($expenseList as $val)
+							   	<p>{!! $val->reference !!} | {!! $val->narrative !!} - {{manageAmountFormat($val->amount)}} </p>
+ 							   	@endforeach
+							   	-–––––––––––––––––––––--------
+							   	<p><b>TOTAL EXPENSES - {{manageAmountFormat($totalexp)}}</b> </p>
+							   	-–––––––––––––––––––––--------
+	                           </div> 
+	                           <div class="col-sm-4">
+ 							   	
+	                           </div> 
+                           </div> 
+
+                        </div>
+							<div style="width: 90%;margin:auto;font-size: 12px; ">
+	                           <div class="col-sm-8">
+
+	                           </div> 
+
+	                           <div class="col-sm-4" style="float: right;width: 10%; margin-bottom: 60px;">
+							   	<b>Net Saless</b><br>
+							   	<div style="border-top:1px solid; border-bottom:1px solid;">
+                    {{manageAmountFormat(abs($totalAmnt) - abs($totalexp))}}
+							   	</div>
+							   	
+	                           </div> 
+							   	<br><br><br>
+                           </div> 
+                            
+                            <br>
+								<div style="width: 90%;margin:auto;font-size: 12px; ">
+								<table width="100%">
+                                    <thead>
+                                    <tr>
+                                      
+                                        <th width="30%"  >Bank Deposited</th>
+                                         <th width="30%"  >Date of Transaction</th>
+                                         <th width="40%"  >Ref No.</th>
+                                         <th width="40%"  >Description</th>
+                                         <th width="20%" style="text-align: right;">Amount</th>
+                                        
+                                    </tr>
+                                     </thead>
+                                    <tbody>
+                                   @php $total_amount = []; //echo "<pre>"; print_r($depoitelist); die; 
+	                                   
+                                    @endphp
+	                                 @foreach($depoitelist as $key=> $val)
+                                   <tr>     
+                                      <td>{{ isset($account_codes[$val->account]) ? $account_codes[$val->account] : '' }}</td>                                      
+                                      <td>{{ $val->trans_date }}</td>                                      
+                                      <td>{{ strtoupper($val->narrative) }}</td>                                      
+                                      <td>{{ $val->reference }}</td>                                      
+                                       <td style="text-align: right;">{{ manageAmountFormat(abs($val->amount)) }}</td>  
+                                    </tr>
+                                    @php $total_amount[] = abs($val->amount);  @endphp
+                                     @endforeach
+                                    </tbody>
+ 
+                                    <tfoot style="font-weight: bold;">
+                                      <td>Grand Total</td>
+                                      <td> </td>
+                                      <td> </td>
+                                      <td> </td>
+                                      <td style="text-align: right;">{{ manageAmountFormat(array_sum($total_amount)) }}</td>
+
+                                    </tfoot>
+
+                                </table>
+                            </div>
+
+                                    </div>
+
+
+                    
+ 
+<div style="width: 90%;margin:auto;font-size: 12px; ">
+	                            <h4>Debtors</h4>
+
+                            </div> 
+                            
+                            <br>
+<div style="width: 90%;margin:auto;font-size: 12px; ">
+								<table width="100%">
+                                    <thead>
+                                    <tr>
+                                      
+                                        <th width="20%"  >Sr. No.</th>
+                                         <th width="30%"  >Customer Name</th>
+                                         <th width="40%"  >Reference</th>
+                                         <th width="40%"  >Transaction Date</th>
+                                         <th width="20%" style="text-align: right;">Balance</th>
+                                        
+                                    </tr>
+                                     </thead>
+                                    <tbody>
+                                   @php $total_amount = []; //echo "<pre>"; print_r($depoitelist); die; 
+	                                   
+                                    @endphp
+	                                 @foreach($mydebtorlist as $key=> $val)
+                                   <tr>     
+                                      <td>{{ $key+1 }}</td>                                      
+                                      <td>{{ $val->customer_name }}</td>                                      
+                                      <td>{{ $val->reference }}
+                                       </td>                                      
+                                      <td>{{ $val->trans_date }}</td>                                      
+                                       <td style="text-align: right;">{{ manageAmountFormat($val->balance) }}</td>  
+                                    </tr>
+                                    @php $total_amount[] = abs($val->balance);  @endphp
+                                     @endforeach
+                                    </tbody>
+ 
+                                    <tfoot style="font-weight: bold;">
+                                      <td>Grand Total</td>
+                                      <td> </td>
+                                      <td> </td>
+                                      <td> </td>
+                                      <td style="text-align: right;">{{ manageAmountFormat(array_sum($total_amount)) }}</td>
+
+                                    </tfoot>
+
+                                </table>
+                            </div>
+                            {{-- <div style="width: 90%;margin:auto;font-size: 12px; ">
+	                            <h4>Returns</h4>
+
+                            </div> 
+                            
+                            <br>
+<div style="width: 90%;margin:auto;font-size: 12px; ">
+<table class="table table-bordered table-hover">
+                                <thead>
+                                  <tr>                                    
+                                      <th>Return No</th>
+                                      <th>Date Returned</th>
+                                      <th>Item Code</th>
+                                      <th>Item Description</th>
+                                      <th>Qty</th>                                      
+                                      <th>Amount</th>                                      
+                                      <th>Total Amount</th>                                      
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  @php $total_amount = []; @endphp
+                                  @foreach($returns as $key=> $val)
+                                  <tr>     
+                                    <td>{{ $val->return_date }}</td>                                      
+                                    <td>{{ date('d/m/Y',strtotime($val->return_date)) }}</td>                                      
+                                    <td>{{ @$val->getInventoryItemDetail->stock_id_code }}</td>                                      
+                                    <td>{{ @$val->getInventoryItemDetail->title }}</td>                                      
+                                    <td>{{ manageAmountFormat(@$val->return_quantity) }}</td>                                      
+                                    <td>{{ manageAmountFormat(@$val->selling_price) }}</td> 
+                                    <td>{{ manageAmountFormat($val->return_quantity * $val->selling_price) }}</td>  
+                                  </tr>
+                                  @php $total_amount[] = abs($val->return_quantity * $val->selling_price);  @endphp
+                                  @endforeach
+                                </tbody>
+ 
+                                <tfoot style="font-weight: bold;">
+                                  <td colspan="6">Grand Total</td>
+                                  <td>{{ manageAmountFormat(array_sum($total_amount)) }}</td>
+                                </tfoot>
+                              </table>
+                            </div> --}}
+                         </div>
+             
+</div>
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,596 @@
+@extends('layouts.admin.admin')
+
+@section('content')
+    @php
+        $user = getLoggeduserProfile();
+    @endphp
+
+    <script>
+        window.user = {!! $user !!};
+        window.schedule = {!! $schedule !!};
+    </script>
+
+    <section class="content" id="vehicle-details">
+        <div class="box box-primary">
+            <div class="box-header with-border" v-cloak>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="box-title"> Delivery Schedule @{{ schedule.delivery_number }}</h3>
+                    <a href="{{ url()->previous() }}" role="button" class="btn btn-primary"> Go Back </a>
+                </div>
+                <div class="session-message-container">
+                    @include('message')
+                </div>
+            </div>
+
+            <div class="box-body" style="padding: 0;">
+                <div class="row" style="margin: 0; padding: 0;">
+                    <div class="col-md-7" id="details-view">
+                        <div style="position:relative; height: 100%; width: 100%;" v-if="loading"> Loading delivery details...</div>
+
+                        <div v-else>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 id="vehicle-name" v-cloak> Delivery Schedule @{{ schedule.delivery_number }} </h5>
+                                <div class="labels">
+                                    <span class="label"
+                                          :class="[vehicleDetails.status === 'finished' ? 'label-success' : vehicleDetails.status === 'in_progress' ? 'label-primary' : 'label-warning']">
+                                        @{{ schedule.display_status }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <span id="vehicle-address" v-cloak> @{{ schedule.route.route_name }} </span>
+                            <div class="d-flex justify-content-between align-items-center" style="margin-top: 20px;">
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fas fa-truck major-detail-icon"></i>
+                                        <span class="major-detail-title"> Vehicle </span>
+                                    </div>
+
+                                    <span class="major-detail-value"> @{{ vehicle?.license_plate_number ?? 'N/A' }} </span>
+                                </div>
+
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fa fa-user-circle major-detail-icon"></i>
+                                        <span class="major-detail-title"> Driver </span>
+                                    </div>
+
+                                    <span class="major-detail-value" v-cloak> @{{ schedule.driver?.name ?? 'N/A' }} </span>
+                                </div>
+
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fa fa-clock major-detail-icon"></i>
+                                        <span class="major-detail-title"> Delivery Duration </span>
+                                    </div>
+
+                                    <span class="major-detail-value" v-cloak> @{{ schedule.duration }} </span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center" style="margin-top: 20px;">
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fa fa-user-tie major-detail-icon"></i>
+                                        <span class="major-detail-title"> Salesman </span>
+                                    </div>
+
+                                    <span class="major-detail-value"> @{{ schedule.shift.salesman.name }} </span>
+                                </div>
+
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fa fa-calendar major-detail-icon"></i>
+                                        <span class="major-detail-title"> Salesman Shift </span>
+                                    </div>
+
+                                    <span class="major-detail-value"> @{{ schedule.shift.shift_id }} </span>
+                                </div>
+
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fa fa-weight major-detail-icon"></i>
+                                        <span class="major-detail-title"> Tonnage </span>
+                                    </div>
+
+                                    <span class="major-detail-value"> @{{ schedule.tonnage }}T </span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center" style="margin-top: 20px;">
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fa fa-users major-detail-icon"></i>
+                                        <span class="major-detail-title"> Customers </span>
+                                    </div>
+
+                                    <span class="major-detail-value"> @{{ schedule.customers_count }} </span>
+                                </div>
+
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fa fa-boxes major-detail-icon"></i>
+                                        <span class="major-detail-title"> Items </span>
+                                    </div>
+
+                                    <span class="major-detail-value"> @{{ schedule.items_count }} </span>
+                                </div>
+
+                                <div class="major-detail d-flex flex-column justify-content-between">
+                                    <div class="d-flex">
+                                        <i class="fa fa-money major-detail-icon"></i>
+                                        <span class="major-detail-title"> Route Total </span>
+                                    </div>
+
+                                    <span class="major-detail-value"> @{{ schedule.total }} </span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center" style="margin-top: 20px;" v-if="vehicle && vehicleDetails.address">
+                                <div class="major-detail d-flex flex-column justify-content-between" style="width: 100%; min-height: 80px; height: auto;">
+                                    <div class="d-flex">
+                                        <i class="fa fa-map-marker major-detail-icon"></i>
+                                        <span class="major-detail-title"> Current Location </span>
+                                    </div>
+
+                                    <span class="major-detail-value" style="font-size: 18px;"> @{{ vehicleDetails.address }} </span>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive" style="margin-top: 20px;">
+                                <div class="box-header with-border"><h3 class="box-title"> Delivery Customers </h3></div>
+                                <table class="table">
+                                    <thead>
+                                    <tr>
+                                        <th style="width: 2%;">#</th>
+                                        <th> Customer</th>
+                                        <th> Orders</th>
+                                        <th> Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                    </thead>
+
+                                    <tbody>
+                                    <tr v-for="(customer, index) in schedule.customers" :key="index">
+                                        <th scope="row" style="width: 2%;"> @{{ index + 1 }}</th>
+                                        <td>@{{ customer.customer.name }}</td>
+                                        <td>@{{ customer.order_ids }}</td>
+                                        <td>@{{ customer.order_delivery_statuses }}</td>
+                                        <td>
+                                            <a href="" title="View Items">
+                                                <i class="fa fa-eye text-primary fa-lg"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-5" id="map-view"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+@endsection
+
+@section('uniquepagestyle')
+    <style>
+        #map-view, #details-view {
+            height: 700px;
+        }
+
+        #details-view {
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        #vehicle-name {
+            margin: 0;
+            font-weight: 700;
+            font-size: 22px;
+        }
+
+        #vehicle-address {
+            font-size: 15px;
+            font-weight: 500;
+            margin-top: 12px;
+        }
+
+        .major-detail {
+            border: 1px solid rgba(0, 0, 0, .125);
+            border-radius: 15px;
+            padding: 10px 15px;
+            height: 80px;
+            min-width: 200px;
+        }
+
+        .major-detail-icon {
+            font-size: 20px;
+        }
+
+        .major-detail-title {
+            font-size: 18px;
+            font-weight: 500;
+            margin-left: 12px;
+            margin-top: -5px;
+        }
+
+        .major-detail-value {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .price-tag {
+            background-color: darkblue;
+            border-radius: 50%;
+            /*color: #FFFFFF;*/
+            /*padding: 15px;*/
+            position: relative;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .price-tag i {
+            color: #fff;
+        }
+
+        /*.price-tag::after {*/
+        /*    content: "";*/
+        /*    position: absolute;*/
+        /*    left: 50%;*/
+        /*    top: 100%;*/
+        /*    transform: translate(-50%, 0);*/
+        /*    width: 0;*/
+        /*    height: 0;*/
+        /*    border-left: 8px solid transparent;*/
+        /*    border-right: 8px solid transparent;*/
+        /*    border-top: 8px solid darkblue;*/
+        /*}*/
+
+        .truck-icon {
+            font-size: 20px;
+        }
+    </style>
+@endsection
+
+@section('uniquepagescript')
+    {{-- <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script> --}}
+    <script src="{{asset('js/sweetalert.js')}}"></script>
+    <script src="{{asset('js/form.js')}}"></script>
+    <script>
+        (g => {
+            let h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window;
+            b = b[c] || (b[c] = {});
+            let d = b.maps || (b.maps = {}), r = new Set, e = new URLSearchParams, u = () => h || (h = new Promise(async (f, n) => {
+                await (a = m.createElement("script"));
+                e.set("libraries", [...r] + "");
+                for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]);
+                e.set("callback", c + ".maps." + q);
+                a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
+                d[q] = f;
+                a.onerror = () => h = n(Error(p + " could not load."));
+                a.nonce = m.querySelector("script[nonce]")?.nonce || "";
+                m.head.append(a)
+            }));
+            d[l] ? console.warn(p + " only loads once. Ignoring:", g) : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n))
+        })({
+            key: "{{ $googleMapsApiKey }}",
+            v: "weekly",
+        });
+    </script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script type="importmap">
+        {
+          "imports": {
+            "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+          }
+        }
+    </script>
+    <script type="module">
+        import {createApp} from 'vue';
+
+        const app = createApp({
+            data() {
+                return {
+                    loading: false,
+                    vehicleDetails: {}
+                }
+            },
+
+            async mounted() {
+                $('body').addClass('sidebar-collapse');
+                // this.initMap();
+                // // this.initPusher();
+
+                // if (this.vehicle?.device_name) {
+                //     await this.getInitialVehicleData().then(() => {
+                //         setInterval(() => {
+                //             this.getInitialVehicleData()
+                //         }, 5000);
+                //     })
+                // } else {
+                //     this.loading = false
+                // }
+            },
+
+            computed: {
+                currentUser() {
+                    return window.user
+                },
+
+                schedule() {
+                    return window.schedule
+                },
+
+                vehicle() {
+                    return this.schedule.vehicle
+                },
+
+                toaster() {
+                    return new Form();
+                },
+            },
+
+            methods: {
+                async initMap() {
+                    const {Map} = await google.maps.importLibrary("maps");
+                    await google.maps.importLibrary("geometry");
+
+                    this.map = new Map(document.getElementById("map-view"), {
+                        center: {lat: -1.28333, lng: 36.81667},
+                        zoom: 13,
+                        mapId: "7c9bd9e078617725",
+                    });
+
+                    await this.drawRoute()
+                },
+
+                initPusher() {
+                    // Enable pusher logging - don't include this in production
+                    // Pusher.logToConsole = true;
+
+                    let pusher = new Pusher('b2012a3c72f2a36ad705', {
+                        cluster: 'ap2'
+                    });
+
+                    let channel = pusher.subscribe('telematics');
+                    channel.bind('data.received', function (data) {
+                        console.log(data)
+                    });
+                },
+
+                resetMap() {
+                    $("#map-view").css("display", "none");
+                    setTimeout(async () => {
+                        $("#map-view").css("display", "block");
+                        await this.initMap();
+                    }, 100)
+                },
+
+                async drawRoute() {
+                    const {AdvancedMarkerElement, PinElement} = await google.maps.importLibrary("marker");
+
+                    if (this.schedule.route.has_valid_location) {
+                        this.map.setCenter({lat: this.schedule.route.start_lat, lng: this.schedule.route.start_lng})
+                        this.map.setZoom(11)
+
+                        const icon = document.createElement("div");
+                        icon.innerHTML = '<i class="fa fa-home fa-2x"></i>';
+                        const pinScaled = new PinElement({
+                            scale: 2.0,
+                            background: "#FBBC04",
+                            borderColor: "#137333",
+                            glyph: icon,
+                        });
+
+                        const marker = new AdvancedMarkerElement({
+                            position: new google.maps.LatLng(this.schedule.route.start_lat, this.schedule.route.start_lng),
+                            content: pinScaled.element,
+                            title: this.schedule.route.starting_location_name ?? 'Loading Location',
+                        });
+
+                        // let map = this.map;
+                        marker.map = this.map;
+                        // await this.drawMarker(this.activeRoute.start_lat, this.activeRoute.start_lng, this.activeRoute.starting_location_name)
+                        for (const polyline of this.schedule.route.polylines) {
+                            const decodedPolyline = google.maps.geometry.encoding.decodePath(polyline.polyline);
+                            await this.renderRoute(decodedPolyline)
+
+                            // let geofenceCoordinates = []
+                            // const routeLatLngs = JSON.parse(polyline.lat_lngs)
+                            // routeLatLngs.forEach(pair => {
+                            //     geofenceCoordinates.push({lat: pair[0], lng: pair[1]})
+                            // })
+                            // await this.renderGeoFence(geofenceCoordinates)
+                        }
+                    }
+
+                    this.schedule.route.wa_route_customer.forEach(shop => {
+                        if (shop.has_valid_location) {
+                            this.drawMarker(shop.lat, shop.lng, shop.bussiness_name)
+                        }
+                    })
+                },
+
+                async drawVehicleOnMap(lat, lng) {
+                    const {AdvancedMarkerElement, PinElement} = await google.maps.importLibrary("marker");
+
+                    const icon = document.createElement("div");
+                    icon.className = "price-tag";
+                    icon.innerHTML = '<i class="fas fa-truck-moving truck-icon"></i>';
+
+                    if (!this.marker) {
+                        this.marker = new AdvancedMarkerElement({
+                            position: new google.maps.LatLng(lat, lng),
+                            content: icon,
+                            title: `${this.vehicle.name} ${this.vehicle.license_plate_number}`,
+                        });
+
+                        this.marker.map = this.map;
+                    } else {
+                        this.marker.position = new google.maps.LatLng(lat, lng)
+                    }
+                },
+
+                async drawMarker(lat, lng, title) {
+                    const {InfoWindow} = await google.maps.importLibrary("maps");
+
+                    let marker = new google.maps.Marker({
+                        position: new google.maps.LatLng(lat, lng),
+                        title: title
+                    });
+
+                    marker.setMap(this.map);
+
+                    const infoWindow = new InfoWindow();
+                    marker.addListener("click", ({domEvent, latLng}) => {
+                        const {target} = domEvent;
+                        infoWindow.close();
+                        infoWindow.setContent(marker.title);
+                        infoWindow.open(marker.map, marker);
+                    });
+                },
+
+                renderRoute(path) {
+                    let route = new google.maps.Polyline({
+                        path: path,
+                        geodesic: true,
+                        strokeColor: "#0000FF",
+                        strokeOpacity: 1.0,
+                        strokeWeight: 8,
+                    });
+
+                    route.setMap(this.map);
+                },
+
+                async renderGeoFence(coordinates) {
+                    const {AdvancedMarkerElement, PinElement} = await google.maps.importLibrary("marker");
+
+                    coordinates.forEach((pair, index) => {
+                        let colors = ["#FF0000", "#30D5C8"]
+                        if (index === 0 || index === 1) {
+                        //     const beachFlagImg = document.createElement("img");
+                        //
+                        //     beachFlagImg.src =
+                        //         "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png";
+                        //
+                        //     const beachFlagMarkerView = new AdvancedMarkerElement({
+                        //         position: {lat: pair.lat, lng: pair.lng},
+                        //         content: beachFlagImg,
+                        //         title: "A marker using a custom PNG Image",
+                        //     });
+                        //     beachFlagMarkerView.setMap(this.map)
+
+                            const drawnCenter = new google.maps.Circle({
+                                strokeColor: "#FF0000",
+                                strokeOpacity: 0.8,
+                                strokeWeight: 2,
+                                fillColor: colors[index],
+                                fillOpacity: 0.1,
+                                center: {lat: pair.lat, lng: pair.lng},
+                                radius: 200
+                            });
+
+                            drawnCenter.setMap(this.map)
+                        console.log(drawnCenter.getPath())
+                        }
+                    })
+                    //
+                    // let NORTH = 0;
+                    // let WEST = -90;
+                    // let SOUTH = 180;
+                    // let EAST = 90;
+                    // let height = 200;
+                    // let width = 400;
+                    //
+                    // coordinates.forEach((pair, index) => {
+                    //     const beachFlagImg = document.createElement("img");
+                    //
+                    //     beachFlagImg.src =
+                    //         "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png";
+                    //
+                    //     const beachFlagMarkerView = new AdvancedMarkerElement({
+                    //         position: {lat: pair.lat, lng: pair.lng},
+                    //         content: beachFlagImg,
+                    //         title: "A marker using a custom PNG Image",
+                    //     });
+                    //     beachFlagMarkerView.setMap(this.map)
+                    //
+                    //     if (index === 0 || index == 1) {
+                    //         console.log(`Center: ${pair.lat}, ${pair.lng}`)
+                    //         const center = new google.maps.LatLng(pair.lat, pair.lng);
+                    //
+                    //         const north = google.maps.geometry.spherical.computeOffset(center, height / 2, NORTH);
+                    //         const south = google.maps.geometry.spherical.computeOffset(center, height / 2, SOUTH);
+                    //
+                    //         const northEast = google.maps.geometry.spherical.computeOffset(north, width / 2, EAST);
+                    //         const northWest = google.maps.geometry.spherical.computeOffset(north, width / 2, WEST);
+                    //
+                    //         const southEast = google.maps.geometry.spherical.computeOffset(south, width / 2, EAST);
+                    //         const southWest = google.maps.geometry.spherical.computeOffset(south, width / 2, WEST);
+                    //
+                    //         const corners = [northEast, northWest, southWest, southEast];
+                    //
+                    //         const rect = new google.maps.Polygon({
+                    //             paths: corners,
+                    //             strokeColor: "#FF0000",
+                    //             strokeOpacity: 0.9,
+                    //             strokeWeight: 1,
+                    //             fillColor: "#FF0000",
+                    //             fillOpacity: 0.3,
+                    //         });
+                    //
+                    //         rect.setMap(this.map);
+                    //         let vertices = rect.getPath();
+                    //         for (let i = 0; i < vertices.getLength(); i++) {
+                    //             const xy = vertices.getAt(i);
+                    //
+                    //             console.log("Coordinate " + i + ":<br>" + xy.lat() + "," + xy.lng());
+                    //             this.drawMarker(xy.lat(), xy.lng(), `Coordinate ${i}`);
+                    //         }
+                    //     }
+                    // })
+                },
+
+                async getInitialVehicleData() {
+                    // axios.get('http://telematics.test/api/devices/latest', {
+                    axios.get('https://telematics.bizwizrp.com/api/devices/latest', {
+                        params: {
+                            device_name: this.vehicle.device_name
+                        }
+                    }).then(async res => {
+                        this.loading = false
+                        this.vehicleDetails = res.data.data
+                        this.vehicleDetails.mileage = this.vehicleDetails.mileage - this.vehicle.odometer_adjustment
+
+                        await this.drawVehicleOnMap(this.vehicleDetails.lat, this.vehicleDetails.lng)
+                        this.map.setCenter({lat: this.vehicleDetails.lat, lng: this.vehicleDetails.lng})
+                        this.map.setZoom(13)
+
+                        // Check for Geo Fence
+                        axios.post('/api/delivery-schedules/check-geo-fence', {
+                            route_id: this.schedule.route_id,
+                            schedule_id: this.schedule.id,
+                            vehicle_id: this.vehicle.id,
+                            lat: this.vehicleDetails.lat,
+                            lng: this.vehicleDetails.lng,
+                        }).then(res => {
+                            //
+                        }).catch(err => {
+                        })
+                    }).catch(error => {
+                        this.loading = false
+                        this.toaster.errorMessage(error.response?.message)
+                    })
+                },
+            },
+        })
+
+        app.mount('#vehicle-details')
+    </script>
+@endsection

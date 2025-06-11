@@ -1,0 +1,106 @@
+@extends('layouts.admin.admin')
+
+@section('content')
+    <section class="content">
+       
+        <div class="box box-primary">
+            <div class="box-header with-border">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3 class="box-title">Exemption Schedules</h3>
+                  
+                   
+                </div>
+            </div>
+
+            <div class="box-body">
+                {!! Form::open(['route' => 'exemption-schedules', 'method' => 'get']) !!}
+                <div class="row">
+
+                    <div class="col-md-2 form-group">
+                        <input type="date" name="start_date" id="from" class="form-control" value="{{ request()->get('start_date') ?? \Carbon\Carbon::now()->toDateString() }}">
+                    </div>
+
+                    <div class="col-md-2 form-group">
+                        <input type="date" name="end_date" id="to" class="form-control" value="{{ request()->get('end_date') ?? \Carbon\Carbon::now()->toDateString() }}">
+                    </div>
+
+                    <div class="col-md-3 form-group">
+                        <button type="submit" class="btn btn-success" name="manage-request" value="filter">Filter</button>
+                        <a class="btn btn-success" href="{!! route('exemption-schedules') !!}">Clear </a>
+                    </div>
+                </div>
+
+                {!! Form::close(); !!}
+
+                <hr>
+
+                @include('message')
+
+
+                <div class="col-md-12">
+                    <table class="table table-bordered table-hover" id="create_datatable">
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date</th>
+                            <th>Schedule</th>
+                            <th>Vehicles</th>
+                            <th>Action</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($exemptionSchedules as $schedule)
+                            <tr>
+                                <th>{{$loop->index+1}}</th>
+                                <td>{{\Carbon\Carbon::parse($schedule->created_at)->toDateString()}}</td>
+                                <td>{{$schedule->schedule_type}}</td>
+                                <td>
+                                    @if($schedule->vehicles->isNotEmpty())
+                                        {{ $schedule->vehicles->pluck('license_plate_number')->implode(', ') }}
+                                    @else
+                                        No vehicles
+                                    @endif
+                                </td>   
+                                <td>
+                                    <div>
+                                        @if ($schedule->status == 'open')
+                                            <a href="{{route('exemption-schedules-edit', $schedule->id)}}"><i class="fas fa-truck"></i></a>                           
+                                        @endif
+                                    </div>
+                                </td>                         
+                            </tr>
+                                
+                            @endforeach
+                         
+                        </tbody>
+               
+                  
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+@endsection
+
+
+@section('uniquepagestyle')
+    <link rel="stylesheet" href="{{ asset('assets/admin/dist/datepicker.css') }}">
+    <link href="{{ asset('assets/admin/bower_components/select2/dist/css/select2.min.css') }}" rel="stylesheet"/>
+@endsection
+
+@section('uniquepagescript')
+    <script src="{{ asset('assets/admin/dist/bootstrap-datepicker.js') }}"></script>
+    <script src="{{ asset('assets/admin/bower_components/select2/dist/js/select2.full.min.js') }}"></script>
+    <script type="text/javascript">
+        $(function () {
+
+            $(".mlselect").select2();
+        });
+    </script>
+
+    <script>
+        $('.datepicker').datepicker({
+            format: 'yyyy-mm-dd'
+        });
+    </script>
+@endsection

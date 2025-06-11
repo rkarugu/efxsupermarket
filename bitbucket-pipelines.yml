@@ -1,0 +1,32 @@
+# This is a sample build configuration for PHP.
+# Check our guides at https://confluence.atlassian.com/x/e8YWN for more examples.
+# Only use spaces to indent your .yml configuration.
+# -----
+# You can specify a custom docker image from Docker Hub as your build environment.
+image: php:7.2
+options:
+  max-time: 10
+pipelines:
+  # default - contains the steps that will run on every push.
+  # default:
+  branches:
+    # You can include your custom branches and the steps you'd like to undertake e.g. testing
+    #staging:
+    master:
+      - step:
+          caches:
+            - composer
+          script:
+            - apt-get update && apt-get install -y unzip libfreetype6-dev libjpeg62-turbo-dev libpng-dev zlib1g-dev libzip-dev libicu-dev
+            - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+            - docker-php-ext-install gd exif zip intl
+            - composer install
+      - step:
+          name: Deploy to staging
+          deployment: staging
+          script:
+            - pipe: atlassian/ssh-run:0.2.2
+              variables:
+                SSH_USER: "efficentrix"
+                SERVER: "206.81.18.182"
+                COMMAND: "/var/www/bizwizdevinstance.com/public_html/deploy.sh"

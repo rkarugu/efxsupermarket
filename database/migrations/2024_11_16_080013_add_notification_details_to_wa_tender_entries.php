@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('wa_tender_entries', function (Blueprint $table) {
+            $table->string('notification_id')->nullable();
+            $table->unsignedBigInteger('wa_sales_invoice_id')->nullable();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('wa_tender_entries', function (Blueprint $table) {
+            $table->dropColumn(['notification_id', 'wa_sales_invoice_id']);
+        });
+    }
+};

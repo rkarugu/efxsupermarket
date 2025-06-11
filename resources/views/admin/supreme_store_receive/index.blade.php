@@ -1,0 +1,140 @@
+@extends('layouts.admin.admin')
+@section('content')
+<section class="content">    
+    <div class="box box-primary">
+        <div class="box-header with-border"><h3 class="box-title"> {!! $title !!} </h3>
+           
+        </div>
+         @include('message')
+         <div class="box-body" style="padding-bottom:15px">
+            <form action="" method="get">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                    <label for="">From</label>
+                    <input type="date" name="start-date" id="start-date" class="form-control" value="{{request()->input('start-date') ?? date('Y-m-d')}}">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                    <label for="">To</label>
+                    <input type="date" name="end-date" id="end-date" class="form-control"  value="{{request()->input('end-date') ?? date('Y-m-d')}}">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                    <button type="submit" id="filter" class="btn btn-primary btn-sm" style="margin-top: 25px;">Filter</button>
+                    </div>
+                </div>
+            </div>
+            </form>
+         <div class="table-responsive">
+             <table class="table table-hover table-bordered table-invert" id="dataTable" style="width: 100%">
+                 <thead>
+                     <tr>
+                         <th style="width:8%">Sr. No.</th>
+                         <th style="width:14%">User</th>
+                         <th style="width:14%">Receipt No</th>
+                         <th style="width:14%">Date/Time</th>
+                         <th style="width:14%">Total Qty</th>
+                         <th  style="width:22%">Action</th>
+                     </tr>
+                 </thead>
+                 <tbody>
+                     
+                 </tbody>
+                 <tfoot>
+                     <tr>
+                         <th colspan="4" style="text-align:right">
+                             Total
+                         </th>
+                         <th id="getTotal" colspan="2">
+                         </th>
+                     </tr>
+                 </tfoot>
+             </table>
+            
+         </div>
+         </div>
+    </div>
+</section>
+@endsection
+@section('uniquepagescript')
+<script>
+        function printBill(slug)
+    {
+        jQuery.ajax({
+            url: $(slug).attr('href'),
+            type: 'GET',
+            async:false,   //NOTE THIS
+            headers: {
+            'X-CSRF-Token': $('meta[name="csrf-token"]').attr('content')
+                },
+            success: function (response) {
+            var divContents = response;
+            var printWindow = window.open('', '', 'width=600');
+            printWindow.document.write(divContents);
+            printWindow.document.close();
+            printWindow.print();
+            printWindow.close();
+
+            }
+        });
+              
+    }
+$(function() {
+    var table = $('#dataTable').DataTable({
+        processing: true,
+        serverSide: true,
+        order: [[0, "desc" ]],
+        pageLength: '<?= Config::get('params.list_limit_admin') ?>',
+        "ajax":{
+        "url": '{!! route($model.'.index') !!}',
+        "dataType": "json",
+        "type": "GET",
+        data:function(data){
+            var from = $('#start-date').val();
+            var to = $('#end-date').val();
+            data.from = from;
+            data.to = to;
+        },
+        "dataSrc": function (suc){
+            if(suc.total){
+                $('#getTotal').html(suc.total);
+            }
+            return suc.data;
+        }
+        },
+        'fnDrawCallback': function (oSettings) {
+            $('.dataTables_filter').each(function () {
+              $('.remove-btn').remove();
+              $(this).append('<a class="btn btn-danger remove-btn mr-xs pull-right ml-2 btn-sm" style="margin-left:5px" href="{{route($model.'.create')}}">Add {{$title}}</a>');
+            });
+        },
+        columns: [
+                { mData: 'id', orderable: true,
+                    render: function (data, type, row, meta) {
+                        return meta.row + meta.settings._iDisplayStart + 1;
+                    }},
+                { data: 'user_name', name: 'user_name', orderable:true  },
+                { data: 'receive_code', name: 'sales_no', orderable:true  },
+                { data: 'date_time', name: 'date_time', orderable:false },
+                { data: 'total', name: 'total', orderable:false },
+                { data: 'links', name: 'links', orderable:false},
+            ],
+        "columnDefs": [
+            { "searchable": false, "targets": 0 },
+        ],
+        language: {
+            searchPlaceholder: "Search"
+        },
+    });
+    $('#filter').click(function(e){
+        e.preventDefault();
+        table.draw();
+        $('#modelId').modal('hide');
+    });
+});
+   
+</script>
+@endsection

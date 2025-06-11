@@ -1,0 +1,1016 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Model\Restaurant;
+use App\Model\Route;
+use App\Model\WaInternalRequisition;
+use App\Models\WaAccountTransaction;
+use App\SalesmanShift;
+use App\Services\ExcelDownloadService;
+use Carbon\Carbon;
+use Carbon\CarbonInterval;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
+use Yajra\DataTables\Facades\DataTables;
+
+class RoutePerformanceReportController extends Controller
+{
+    protected $model;
+    protected $base_route;
+    protected $resource_folder;
+    protected $base_title;
+    protected $permissions_module;
+
+    public function __construct()
+    {
+        $this->model = 'route-performance-report';
+        $this->base_route = 'route-performance-report';
+        $this->resource_folder = 'admin.salesreceiablesreports';
+        $this->base_title = 'Route Performance Report';
+        $this->permissions_module = 'sales-and-receivables-reports';
+    }
+
+    public function index(Request $request)
+    {
+
+
+        $title = $this->base_title;
+        $model = $this->model;
+        $breadcum = ['Sales & Receivables' => '', 'Reports' => '', 'Route Performance Report' => ''];
+        $branches = Restaurant::where('name','like','%thika%')->get();
+        $branchIds = $branches->pluck('id')->toArray();
+        $routes = Route::whereIn('restaurant_id', $branchIds)
+            ->select('id', 'route_name')
+            ->get();
+
+        if (!can('route-performance-report', $this->permissions_module)) {
+            Session::flash('warning', pageRestrictedMessage());
+            return redirect()->back();
+        }
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+
+        if(!$request->datePicker){
+            $startDate = Carbon::now()->startOfDay()->format('Y-m-d H:i:s');
+            $endDate = Carbon::now()->endOfDay()->format('Y-m-d H:i:s');
+            return view("$this->resource_folder.route_performance", compact('title', 'model', 'breadcum', 'routes',   'branches'));
+        }else{
+              if ($request->selectionType  == 'single'){
+            $startDate = Carbon::parse($request->datePicker)->startOfDay()->format('Y-m-d H:i:s');
+            $endDate = Carbon::parse($request->datePicker)->endOfDay()->format('Y-m-d H:i:s');
+
+        }else{
+            $dates = explode(' to ', $request->datePicker);
+            $startDate = Carbon::parse($dates[0])->startOfDay()->format('Y-m-d H:i:s');
+            $endDate = Carbon::parse($dates[1])->endOfDay()->format('Y-m-d H:i:s');
+        }
+
+        }
+
+        $start_date = Carbon::parse($startDate)->toDateString();
+        $end_date = Carbon::parse($endDate)->toDateString();
+        //filter  routes with  data only
+        $query = DB::table('routes')
+            ->leftJoin('salesman_shifts', 'salesman_shifts.route_id', '=', 'routes.id')
+            ->leftJoin('users', 'users.id', '=', 'salesman_shifts.salesman_id')
+            ->whereNot('salesman_shifts.status', 'not_started')
+            ->whereBetween('salesman_shifts.created_at', [$startDate, $endDate]);
+        
+        if ($request->branch) {
+            $query->where('routes.restaurant_id', $request->branch);
+        } else {
+            $query->whereIn('routes.restaurant_id', $branchIds);
+        }
+        if ($request->route) {
+            $query = $query->where('routes.id', $request->route);
+        }
+        $data = $query->select([
+            'routes.id as route_id',
+            'routes.route_name as route',
+            'routes.group as group',
+            'routes.order_frequency',
+            'users.name as salesman',
+            'routes.order_taking_days',
+            'routes.tonnage_target',
+            'routes.sales_target',
+            'routes.ctn_target',
+            'routes.dzn_target',
+            'salesman_shifts.id as salesman_shifts_id',
+            'salesman_shifts.start_time as start_time',
+            'salesman_shifts.closed_time as closed_time',
+            DB::raw("(select count(*) from delivery_centres where delivery_centres.route_id = routes.id and delivery_centres.deleted_at is null) as centre_count"),
+            DB::raw("(select count(*) from wa_route_customers where wa_route_customers.route_id = routes.id and wa_route_customers.deleted_at is null) as shop_count"),
+                DB::raw("(select count(distinct salesman_shift_customers.route_customer_id) 
+                from wa_internal_requisitions 
+                join salesman_shift_customers on wa_internal_requisitions.wa_shift_id = salesman_shift_customers.salesman_shift_id
+                where salesman_shift_customers.visited = 1 and wa_internal_requisitions.route_id = routes.id and wa_internal_requisitions.created_at between '$startDate' and '$endDate') as met_shops"),
+
+            DB::raw("(SELECT COUNT(DISTINCT wa_internal_requisitions.wa_route_customer_id) 
+                  FROM wa_internal_requisitions 
+                  INNER JOIN salesman_shifts ON wa_internal_requisitions.wa_shift_id = salesman_shifts.id 
+                  WHERE  wa_internal_requisitions.shift_type = 'onsite' 
+                  AND salesman_shifts.created_at BETWEEN '$startDate' AND '$endDate'
+                  AND wa_internal_requisitions.wa_route_customer_id IN (
+                      SELECT DISTINCT wa_route_customers.id 
+                      FROM wa_route_customers 
+                      WHERE wa_route_customers.route_id = routes.id
+                  )) as total_onsite_shops"),
+
+            DB::raw("(SELECT COUNT(DISTINCT wa_internal_requisitions.wa_route_customer_id) 
+                  FROM wa_internal_requisitions 
+                  INNER JOIN salesman_shifts ON wa_internal_requisitions.wa_shift_id = salesman_shifts.id 
+                  WHERE wa_internal_requisitions.shift_type = 'offsite' 
+                  AND DATE(salesman_shifts.created_at) BETWEEN '$startDate' AND '$endDate'
+                  AND wa_internal_requisitions.wa_route_customer_id IN (
+                      SELECT DISTINCT wa_route_customers.id 
+                      FROM wa_route_customers 
+                      WHERE wa_route_customers.route_id = routes.id
+                  )
+            ) as total_offsite_shops"),
+            DB::raw("(SELECT COUNT(DISTINCT salesman_shift_customers.route_customer_id, salesman_shift_customers.salesman_shift_id) 
+            FROM salesman_shift_customers
+            LEFT JOIN salesman_shifts ON salesman_shift_customers.salesman_shift_id = salesman_shifts.id 
+            WHERE DATE(salesman_shifts.created_at) BETWEEN '$startDate' AND '$endDate'
+            AND salesman_shifts.route_id = routes.id
+            AND salesman_shift_customers.visited = 1
+            AND salesman_shift_customers.order_taken = 0) as met_with_no_orders"),
+
+            DB::raw("(SELECT COUNT(*) as offsite
+                    FROM salesman_shifts 
+                    WHERE salesman_shifts.route_id = routes.id 
+                    AND salesman_shifts.shift_type = 'offsite'
+                    AND salesman_shifts.created_at BETWEEN '$startDate' AND '$endDate') as total_offsite_shifts"),
+
+            DB::raw("(SELECT COUNT(*) as onsite
+                    FROM salesman_shifts 
+                    WHERE salesman_shifts.route_id = routes.id 
+                    AND salesman_shifts.shift_type = 'onsite'
+                    AND salesman_shifts.created_at BETWEEN '$startDate' AND '$endDate') as total_onsite_shifts"),
+
+                // DB::raw("(SELECT SUM(TIME_TO_SEC(TIMEDIFF(closed_time, start_time)) / 3600) as total_onsite_hours
+                //  FROM salesman_shifts 
+                //  WHERE salesman_shifts.route_id = routes.id 
+                //  AND salesman_shifts.shift_type = 'onsite'
+                //  AND salesman_shifts.created_at BETWEEN '$startDate' AND '$endDate') as total_onsite_hours"),
+
+                // DB::raw("(SELECT SUM(TIME_TO_SEC(TIMEDIFF(closed_time, start_time)) / 3600) as total_offsite_hours
+                //  FROM salesman_shifts 
+                //  WHERE salesman_shifts.route_id = routes.id 
+                //  AND salesman_shifts.shift_type = 'offsite'
+                //  AND salesman_shifts.created_at BETWEEN '$startDate' AND '$endDate') as total_offsite_hours"),
+
+
+            DB::raw("(select sum(wa_internal_requisition_items.total_cost_with_vat) from wa_internal_requisition_items
+            join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            where wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            as gross_sales"),
+            DB::raw("(select sum(wa_inventory_location_transfer_item_returns.received_quantity * wa_inventory_location_transfer_items.selling_price)
+            from wa_inventory_location_transfer_item_returns
+            join wa_inventory_location_transfers on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_id = wa_inventory_location_transfers.id
+            join wa_inventory_location_transfer_items on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_item_id = wa_inventory_location_transfer_items.id
+            where wa_inventory_location_transfers.route = routes.route_name and wa_inventory_location_transfers.created_at between '$startDate' and '$endDate')
+            as returns"),
+            DB::raw("(select sum(COALESCE(wa_inventory_items.net_weight * wa_internal_requisition_items.quantity, 0) / 1000) from wa_internal_requisition_items
+            left join wa_inventory_items on wa_internal_requisition_items.wa_inventory_item_id = wa_inventory_items.id
+            left join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            where wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            as tonnage"),
+            DB::raw("(select count(distinct concat(wa_inventory_items.id ,date(wa_internal_requisition_items.created_at)) ) from wa_internal_requisition_items
+            left join wa_inventory_items on wa_internal_requisition_items.wa_inventory_item_id = wa_inventory_items.id
+            left join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            where wa_inventory_items.pack_size_id = 3 and wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            as ctns"),
+
+            DB::raw("(select sum(CASE WHEN pack_sizes.title = 'CTN' THEN wa_inventory_location_transfer_item_returns.received_quantity ELSE 0 END) from wa_inventory_location_transfer_item_returns
+            join wa_inventory_location_transfer_items on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_item_id = wa_inventory_location_transfer_items.id
+            join wa_inventory_items on wa_inventory_location_transfer_items.wa_inventory_item_id = wa_inventory_items.id
+            join pack_sizes on wa_inventory_items.pack_size_id = pack_sizes.id
+            join wa_inventory_location_transfers on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_id = wa_inventory_location_transfers.id
+            where wa_inventory_location_transfers.route = routes.route_name and wa_inventory_location_transfers.created_at between '$startDate' and '$endDate')
+            as returned_ctns"),
+            
+            DB::raw("(select count(distinct concat(wa_inventory_items.id, date(wa_internal_requisition_items.created_at))) from wa_internal_requisition_items
+            left join wa_inventory_items on wa_internal_requisition_items.wa_inventory_item_id = wa_inventory_items.id
+            left join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            where wa_inventory_items.pack_size_id in (6,9,17,4,10,1) and wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            as dzns"),
+
+            DB::raw("(select sum(CASE WHEN pack_sizes.id in (6,9,17,4,10,1) THEN wa_inventory_location_transfer_item_returns.received_quantity ELSE 0 END) from wa_inventory_location_transfer_item_returns
+            join wa_inventory_location_transfer_items on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_item_id = wa_inventory_location_transfer_items.id
+            join wa_inventory_items on wa_inventory_location_transfer_items.wa_inventory_item_id = wa_inventory_items.id
+            join pack_sizes on wa_inventory_items.pack_size_id = pack_sizes.id
+            join wa_inventory_location_transfers on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_id = wa_inventory_location_transfers.id
+            where wa_inventory_location_transfers.route = routes.route_name and wa_inventory_location_transfers.created_at between '$startDate' and '$endDate')
+            as returned_dzns"),
+
+            DB::raw("(select count(distinct(requisition_date)) from wa_internal_requisitions where route_id = routes.id and created_at between '$startDate' and '$endDate') as frequency")
+        ])
+            // ->join('route_user', 'routes.id', '=', 'route_user.route_id')
+            // ->join('users', function ($join) {
+            //     $join->on('route_user.user_id', '=', 'users.id')->where('users.role_id', 4);
+            // })
+            ->get();
+
+            $data = $data->map(function ($record) use ($filterfrequency, $request, $startDate, $endDate) {
+                //calculate time spent onsite and offsite
+                $offsiteRequest = $offSiteRequests = DB::table('offsite_shift_requests')
+                ->where('status', 'approved')
+                ->where('shift_id', $record->salesman_shifts_id)
+                ->orderBy('id', 'desc')
+                ->first();
+                $onsite_start = Carbon::parse($record->start_time)->format('Y-m-d H:i:s');
+                $onsite_end = Carbon::parse($record->closed_time)->format('Y-m-d H:i:s');
+                if($offsiteRequest){
+                    $onsite_end = Carbon::parse($offsiteRequest->updated_at)->format('Y-m-d H:i:s');
+                    $onsiteDuration = Carbon::parse($offsiteRequest->updated_at)->diffInMinutes(Carbon::parse($record->start_time));
+                    $onsiteDuration = CarbonInterval::minutes($onsiteDuration)->totalHours;
+                    $offsite_start = $onsite_end;
+                    $offsite_end = Carbon::parse($record->closed_time)->format('Y-m-d H:i:s');
+                    $offsiteDuration = Carbon::parse($record->closed_time)->diffInMinutes(Carbon::parse($offsiteRequest->updated_at));
+                    $offsiteDuration = CarbonInterval::minutes($offsiteDuration)->totalHours;
+                }else{
+                    $onsiteDuration = Carbon::parse($record->closed_time)->diffInMinutes(Carbon::parse($record->start_time));
+                    $onsiteDuration = CarbonInterval::minutes($onsiteDuration)->totalHours;
+                    $offsiteDuration = 0;
+                }
+                $record->total_onsite_hours = $onsiteDuration;
+                $record->total_offsite_hours = $offsiteDuration;
+
+                $start = Carbon::parse($startDate);
+                $end = Carbon::parse($endDate);
+                $multiplier = 1;
+                if($start and $end) {
+                    $number_of_days = $end->diffInDays($start) + 1;
+                if($number_of_days == 1) {
+                        $multiplier = 1;
+                }else{
+                    $multiplier = number_format((($number_of_days / 7) * $record->order_frequency), 2);
+                }                   
+                    
+                }
+                $record->multiplier  = $multiplier;
+
+                $orderTakingDays = $record->frequency;
+                $record->net_sales = $record->gross_sales - $record->returns;
+                $record->unmet = $record->shop_count - $record->met_shops;
+                // $record->total_order_taking_days = $orderTakingDays;
+                $record->total_order_taking_days = $multiplier;
+
+                $record->freq = $orderTakingDays;
+                $record->met_customers_percentage = $record->shop_count != 0 ? ($record->met_shops / $record->shop_count) * 100 : 0;
+
+                $netsales = $record->net_sales;
+                $tonnagedata = $record->tonnage;
+                $ctnsdata = $record->ctns;
+                $dznsdata = $record->dzns;
+
+                $record->sales_percentage = ((($record->sales_target) != 0) && (($record->total_order_taking_days) != 0)) ? (($netsales / ($record->sales_target * $record->total_order_taking_days)) * 100) : 0;
+                $record->tonnage_percentage = ((($record->tonnage_target ) != 0) && (($record->total_order_taking_days) != 0)) ? (($tonnagedata / ($record->tonnage_target * $record->total_order_taking_days)) * 100) : 0;
+                $record->ctns_percentage = ((($record->ctn_target ) != 0 ) && (($record->total_order_taking_days) != 0)) ? (($ctnsdata / ($record->ctn_target * $record->total_order_taking_days)) * 100) : 0;
+                $record->dzns_percentage = ((($record->dzn_target ) != 0 ) && (($record->total_order_taking_days) != 0)) ? (($dznsdata / ($record->dzn_target * $record->total_order_taking_days)) * 100) : 0;
+
+                $record->avg_percentage = ($record->met_customers_percentage + $record->sales_percentage + $record->tonnage_percentage + $record->ctns_percentage + $record->dzns_percentage) / 5;
+
+                $record->met_customers_percentage = round($record->met_customers_percentage, 2);
+                $record->sales_percentage = round($record->sales_percentage, 2);
+                $record->tonnage_percentage = round($record->tonnage_percentage, 2);
+                $record->ctns_percentage = round($record->ctns_percentage, 2);
+                $record->dzns_percentage = round($record->dzns_percentage, 2);
+                $record->avg_percentage = round($record->avg_percentage, 2);
+
+                return $record;
+            });
+        if ($request->group) {
+            $data = $data->where('group', $request->group)->all();
+        }
+
+        $data = collect($data);
+
+        if ($request->filter && $request->filter == 'sales') {
+            $data = $data->sortBy('net_sales', descending: true);
+        }
+        if ($request->filter && $request->filter == 'tonnage') {
+            $data = $data->sortBy('tonnage', descending: true);
+        }
+        if ($request->filter && $request->filter == 'ctns') {
+            $data = $data->sortBy('ctns', descending: true);
+        }
+        if ($request->filter && $request->filter == 'dzns') {
+            $data = $data->sortBy('dzns', descending: true);
+        }
+        if ($request->filter && $request->filter == 'unmet') {
+            $data = $data->sortBy('unmet', descending: false);
+        }
+
+        $totalGrossSales = $data->sum('gross_sales');
+        $totalReturns = $data->sum('returns');
+        $totalNetSales = $data->sum('net_sales');
+        $totalTonnage = $data->sum('tonnage');
+        $totalCtns = $data->sum('ctns');
+        $totalDzns = $data->sum('dzns');
+
+    //    dd($data);
+
+        if ($request->intent == 'EXCEL') {
+            $headings = ['ROUTE', 'GROUP', 'SALESMAN', 'FREQ', 'CENTRE COUNT', 'SHOP COUNT', 'MET SHOPS', 'MET ONSITE','MET OFFSITE','MET WITH NO ORDERS','UNMET','TIME ONSITE', 'TIME OFFSITE', 'MET CUSTOMERS %', 'TARGET TONNAGE', 'TONNAGE', 'TONNAGE %', 'TARGET CTNS', 'CTNS', 'CTNS %', 'TARGET DZNS', 'DZNS', 'DZNS %', 'TARGET SALES', 'GROSS SALES', 'RETURNS', 'NET SALES', 'SALES %', 'OVERALL AVG % PERFORMANCE'];
+            $filename = "ROUTE PERFORMANCE REPORT $startDate - $endDate";
+            $excelData = [];
+            foreach ($data as $row) {
+
+                $payload = [
+                    'route' => $row->route,
+                    'group' => $row->group,
+                    'salesman' => $row->salesman,
+                    'freq' => $row->multiplier,
+                    'centre-count' => $row->centre_count,
+                    'Shop-count' => $row->shop_count,
+                    'met-shops' => $row->met_shops,
+                    'met-onsite' => max(0, $row->total_onsite_shops ?? 0),
+                    'met-offsite' => $row->met_shops - ($row->total_onsite_shops ?? 0) - ($row->met_with_no_orders ?? 0),
+                    'met-with-no-orders' => $row->met_with_no_orders,
+                    'unmet' => $row->shop_count - ($row->met_shops ?? 0),
+                    'hours-onsite' => number_format($row->total_onsite_hours, 2),
+                    'hours-offsite' => number_format($row->total_offsite_hours, 2),
+                    'met-customer-percentage' => number_format($row->met_customers_percentage, 2),
+                    'target-tonnage' => number_format(($row->tonnage_target * $row->total_order_taking_days), 2),
+                    'tonnage' => number_format(($row->tonnage), 2),
+                    'tonnage-percentage' => number_format($row->tonnage_percentage, 2),
+                    'target-ctns' => number_format(($row->ctn_target * $row->total_order_taking_days), 2),
+                    'ctns' => number_format(($row->ctns), 2),
+                    'ctns-percentage' => number_format($row->ctns_percentage, 2),
+                    'target-dzns' =>  number_format(($row->dzn_target * $row->total_order_taking_days), 2),
+                    'dzns' => number_format(($row->dzns), 2),
+                    'dzns-percentage' => number_format($row->dzns_percentage, 2),
+                    'target-sales' => number_format(($row->sales_target * $row->total_order_taking_days), 2),
+                    'gross-sales' => number_format(($row->gross_sales), 2),
+                    'returns' => number_format(($row->returns), 2),
+                    'net-sales' => number_format(($row->net_sales ), 2),
+                    'sales-percentage' => number_format($row->sales_percentage, 2),
+                    'overall-avg-percentage' => number_format($row->avg_percentage, 2),
+                ];
+                $excelData[] = $payload;
+            }
+            return ExcelDownloadService::download($filename, collect($excelData), $headings);
+        }
+        return view("$this->resource_folder.route_performance", compact('title', 'model', 'breadcum', 'routes', 'data', 'totalGrossSales', 'filterfrequency', 'totalReturns', 'totalNetSales', 'totalTonnage', 'totalCtns', 'totalDzns', 'start_date', 'end_date', 'branches'));
+
+    }
+
+    public function salesPerRoute(Request $request)
+    {
+
+        $title = 'Sales Performance report';
+        $model = $this->model;
+        $breadcum = ['Sales & Receivables' => '', 'Reports' => '', 'Route Performance Report' => ''];
+
+        $branches = Restaurant::where('name','like','%thika%')->get();
+        $branchIds = $branches->pluck('id')->toArray();
+        $routes = Route::select('id', 'route_name')->get();
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+        if(!$request->datePicker){
+            return view("admin.sales_and_receivables_reports.route_performance", compact('title', 'model', 'breadcum', 'routes', 'branches'));
+
+
+        }else{
+            if ($request->selectionType  == 'single'){
+                $start_date = Carbon::parse($request->datePicker)->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($request->datePicker)->endOfDay()->format('Y-m-d H:i:s');
+
+            }else{
+                $dates = explode(' to ', $request->datePicker);
+                $start_date = Carbon::parse($dates[0])->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($dates[1])->endOfDay()->format('Y-m-d H:i:s');
+            }
+
+        }
+
+
+        $startDate = $start_date;
+        $endDate = $end_date;
+        $data = $this->q2($request, $startDate, $endDate, $branchIds);
+
+        if ($request->group) {
+            $data = $data->where('group', $request->group)->all();
+        }
+
+        $data = collect($data);
+
+        if ($request->filter && $request->filter == 'sales') {
+            $data = $data->sortBy('net_sales', descending: true);
+        }
+        if ($request->filter && $request->filter == 'tonnage') {
+            $data = $data->sortBy('tonnage', descending: true);
+        }
+        if ($request->filter && $request->filter == 'ctns') {
+            $data = $data->sortBy('ctns', descending: true);
+        }
+        if ($request->filter && $request->filter == 'dzns') {
+            $data = $data->sortBy('dzns', descending: true);
+        }
+        if ($request->filter && $request->filter == 'unmet') {
+            $data = $data->sortBy('unmet', descending: false);
+        }
+
+        $totalGrossSales = $data->sum('gross_sales');
+        $totalReturns = $data->sum('returns');
+        $totalNetSales = $data->sum('net_sales');
+        $totalTonnage = $data->sum('tonnage');
+        $totalCtns = $data->sum('ctns');
+        $totalDzns = $data->sum('dzns');
+
+        if ($request->intent == 'EXCEL') {
+            $headings = ['ROUTE', 'GROUP', 'SALESMAN', 'FREQ', 'CENTRE COUNT', 'SHOP COUNT', 'TARGET SALES', 'GROSS SALES', 'RETURNS', 'NET SALES', 'SALES %'];
+            $filename = "ROUTE SALES PERFORMANCE REPORT $startDate - $endDate";
+            $excelData = [];
+            foreach ($data as $row) {
+
+                $payload = [
+                    'route' => $row->route,
+                    'group' => $row->group,
+                    'salesman' => $row->salesman,
+                    'freq' => $row->multiplier,
+                    'centre-count' => $row->centre_count,
+                    'Shop-count' => $row->shop_count,
+                    'target-sales' => number_format(($row->sales_target * $row->total_order_taking_days), 2),
+                    'gross-sales' => number_format(($row->gross_sales), 2),
+                    'returns' => number_format(($row->returns), 2),
+                    'net-sales' => number_format(($row->net_sales ), 2),
+                    'sales-percentage' => number_format($row->sales_percentage, 2),
+                ];
+                $excelData[] = $payload;
+            }
+            return ExcelDownloadService::download($filename, collect($excelData), $headings);
+        }
+
+        return view("admin.sales_and_receivables_reports.route_performance", compact('title', 'model', 'breadcum', 'routes', 'data', 'totalGrossSales', 'filterfrequency', 'totalReturns', 'totalNetSales', 'totalTonnage', 'totalCtns', 'totalDzns', 'start_date', 'end_date', 'branches'));
+
+    }
+
+
+    public function q2(Request $request, $startDate, $endDate, $branchIds)
+    {
+
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+
+        $query = DB::table('routes');
+        if ($request->branch) {
+            $query->where('routes.restaurant_id', $request->branch);
+        } else {
+            $query->whereIn('routes.restaurant_id', $branchIds);
+        }
+        if ($request->route) {
+            $query = $query->where('routes.id', $request->route);
+        }
+        $data = $query->select([
+            'routes.id as route_id',
+            'routes.route_name as route',
+            'routes.group as group',
+            'routes.order_frequency',
+            'users.name as salesman',
+            'routes.order_taking_days',
+            'routes.tonnage_target',
+            'routes.sales_target',
+            'routes.ctn_target',
+            'routes.dzn_target',
+            DB::raw("(select count(*) from delivery_centres where delivery_centres.route_id = routes.id and delivery_centres.deleted_at is null) as centre_count"),
+            DB::raw("(select count(*) from wa_route_customers where wa_route_customers.route_id = routes.id and wa_route_customers.deleted_at is null) as shop_count"),
+            // DB::raw("(select count(distinct wa_route_customer_id) from wa_internal_requisitions where wa_internal_requisitions.route_id = routes.id and wa_internal_requisitions.created_at between '$startDate' and '$endDate') as met_shops"),
+            DB::raw("(select count(distinct salesman_shift_customers.route_customer_id) 
+                from wa_internal_requisitions 
+                join salesman_shift_customers on wa_internal_requisitions.wa_shift_id = salesman_shift_customers.salesman_shift_id
+                where salesman_shift_customers.visited = 1 and wa_internal_requisitions.route_id = routes.id and wa_internal_requisitions.created_at between '$startDate' and '$endDate') as met_shops"),
+
+            DB::raw("(select sum(wa_internal_requisition_items.total_cost_with_vat) from wa_internal_requisition_items
+            join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            where wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            as gross_sales"),
+            DB::raw("(select sum(wa_inventory_location_transfer_item_returns.received_quantity * wa_inventory_location_transfer_items.selling_price)
+            from wa_inventory_location_transfer_item_returns
+            join wa_inventory_location_transfers on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_id = wa_inventory_location_transfers.id
+            join wa_inventory_location_transfer_items on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_item_id = wa_inventory_location_transfer_items.id
+            where wa_inventory_location_transfers.route = routes.route_name and wa_inventory_location_transfers.created_at between '$startDate' and '$endDate')
+            as returns"),
+            DB::raw("(select sum(COALESCE(wa_inventory_items.net_weight * wa_internal_requisition_items.quantity, 0) / 1000) from wa_internal_requisition_items
+            left join wa_inventory_items on wa_internal_requisition_items.wa_inventory_item_id = wa_inventory_items.id
+            left join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            where wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            as tonnage"),
+            // DB::raw("(select sum(CASE WHEN pack_sizes.title = 'CTN' THEN wa_internal_requisition_items.quantity ELSE 0 END) from wa_internal_requisition_items
+            // left join wa_inventory_items on wa_internal_requisition_items.wa_inventory_item_id = wa_inventory_items.id
+            // left  join pack_sizes on wa_inventory_items.pack_size_id = pack_sizes.id
+            // left join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            // where wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            // as ctns"),
+            DB::raw("(select count(distinct concat(wa_inventory_items.id ,date(wa_internal_requisition_items.created_at)) ) from wa_internal_requisition_items
+            left join wa_inventory_items on wa_internal_requisition_items.wa_inventory_item_id = wa_inventory_items.id
+            left join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            where wa_inventory_items.pack_size_id = 3 and wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            as ctns"),
+
+            DB::raw("(select sum(CASE WHEN pack_sizes.title = 'CTN' THEN wa_inventory_location_transfer_item_returns.received_quantity ELSE 0 END) from wa_inventory_location_transfer_item_returns
+            join wa_inventory_location_transfer_items on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_item_id = wa_inventory_location_transfer_items.id
+            join wa_inventory_items on wa_inventory_location_transfer_items.wa_inventory_item_id = wa_inventory_items.id
+            join pack_sizes on wa_inventory_items.pack_size_id = pack_sizes.id
+            join wa_inventory_location_transfers on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_id = wa_inventory_location_transfers.id
+            where wa_inventory_location_transfers.route = routes.route_name and wa_inventory_location_transfers.created_at between '$startDate' and '$endDate')
+            as returned_ctns"),
+
+            // DB::raw("(select sum(CASE WHEN pack_sizes.id in (6,9,17,4,10,1) THEN wa_internal_requisition_items.quantity ELSE 0 END) from wa_internal_requisition_items
+            // left join wa_inventory_items on wa_internal_requisition_items.wa_inventory_item_id = wa_inventory_items.id
+            // left  join pack_sizes on wa_inventory_items.pack_size_id = pack_sizes.id
+            // left join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            // where wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            // as dzns"),
+
+            DB::raw("(select count(distinct concat(wa_inventory_items.id, date(wa_internal_requisition_items.created_at))) from wa_internal_requisition_items
+            left join wa_inventory_items on wa_internal_requisition_items.wa_inventory_item_id = wa_inventory_items.id
+            left join wa_internal_requisitions on wa_internal_requisition_items.wa_internal_requisition_id = wa_internal_requisitions.id
+            where wa_inventory_items.pack_size_id in (6,9,17,4,10,1) and wa_internal_requisitions.route_id = routes.id and wa_internal_requisition_items.created_at between '$startDate' and '$endDate')
+            as dzns"),
+
+            DB::raw("(select sum(CASE WHEN pack_sizes.id in (6,9,17,4,10,1) THEN wa_inventory_location_transfer_item_returns.received_quantity ELSE 0 END) from wa_inventory_location_transfer_item_returns
+            join wa_inventory_location_transfer_items on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_item_id = wa_inventory_location_transfer_items.id
+            join wa_inventory_items on wa_inventory_location_transfer_items.wa_inventory_item_id = wa_inventory_items.id
+            join pack_sizes on wa_inventory_items.pack_size_id = pack_sizes.id
+            join wa_inventory_location_transfers on wa_inventory_location_transfer_item_returns.wa_inventory_location_transfer_id = wa_inventory_location_transfers.id
+            where wa_inventory_location_transfers.route = routes.route_name and wa_inventory_location_transfers.created_at between '$startDate' and '$endDate')
+            as returned_dzns"),
+
+            DB::raw("(select count(distinct(requisition_date)) from wa_internal_requisitions where route_id = routes.id and created_at between '$startDate' and '$endDate') as frequency")
+        ])
+            ->join('route_user', 'routes.id', '=', 'route_user.route_id')
+            ->join('users', function ($join) {
+                $join->on('route_user.user_id', '=', 'users.id')->where('users.role_id', 4);
+            })
+//            ->take(30)
+            ->get()
+            ->map(function ($record) use ($filterfrequency, $request, $startDate, $endDate) {
+                $start = Carbon::parse($startDate);
+                $end = Carbon::parse($endDate);
+                $multiplier = 1;
+                if($start and $end) {
+                    $number_of_days = $end->diffInDays($start) + 1;
+                    if($number_of_days == 1) {
+                        $multiplier = 1;
+                    }else{
+                        $multiplier = number_format((($number_of_days / 7) * $record->order_frequency), 2);
+                    }
+
+
+                }
+                $record->multiplier  = $multiplier;
+
+
+
+                $orderTakingDays = $record->frequency;
+                $record->net_sales = $record->gross_sales - $record->returns;
+                $record->unmet = $record->shop_count - $record->met_shops;
+                // $record->total_order_taking_days = $orderTakingDays;
+                $record->total_order_taking_days = $multiplier;
+
+                $record->freq = $orderTakingDays;
+                $record->met_customers_percentage = $record->shop_count != 0 ? ($record->met_shops / $record->shop_count) * 100 : 0;
+
+                $netsales = $record->net_sales;
+                $tonnagedata = $record->tonnage;
+                $ctnsdata = $record->ctns;
+                $dznsdata = $record->dzns;
+
+                $record->sales_percentage = ((($record->sales_target) != 0) && (($record->total_order_taking_days) != 0)) ? (($netsales / ($record->sales_target * $record->total_order_taking_days)) * 100) : 0;
+                $record->tonnage_percentage = ((($record->tonnage_target ) != 0) && (($record->total_order_taking_days) != 0)) ? (($tonnagedata / ($record->tonnage_target * $record->total_order_taking_days)) * 100) : 0;
+                $record->ctns_percentage = ((($record->ctn_target ) != 0 ) && (($record->total_order_taking_days) != 0)) ? (($ctnsdata / ($record->ctn_target * $record->total_order_taking_days)) * 100) : 0;
+                $record->dzns_percentage = ((($record->dzn_target ) != 0 ) && (($record->total_order_taking_days) != 0)) ? (($dznsdata / ($record->dzn_target * $record->total_order_taking_days)) * 100) : 0;
+
+                $record->avg_percentage = ($record->met_customers_percentage + $record->sales_percentage + $record->tonnage_percentage + $record->ctns_percentage + $record->dzns_percentage) / 5;
+
+                $record->met_customers_percentage = round($record->met_customers_percentage, 2);
+                $record->sales_percentage = round($record->sales_percentage, 2);
+                $record->tonnage_percentage = round($record->tonnage_percentage, 2);
+                $record->ctns_percentage = round($record->ctns_percentage, 2);
+                $record->dzns_percentage = round($record->dzns_percentage, 2);
+                $record->avg_percentage = round($record->avg_percentage, 2);
+
+                return $record;
+            });
+        return $data;
+    }
+
+
+    public function unmetCustomers(Request $request)
+    {
+        $title = 'Unmet Customers Report';
+        $model = $this->model;
+        $breadcum = ['Sales & Receivables' => '', 'Reports' => '', 'Route Performance Report' => ''];
+
+        $branches = Restaurant::where('name','like','%thika%')->get();
+        $branchIds = $branches->pluck('id')->toArray();
+
+        $routes = Route::select('id', 'route_name')->get();
+        if(!$request->datePicker){
+            return view("admin.sales_and_receivables_reports.unmet-customers", compact('title', 'model', 'breadcum', 'routes', 'branches'));
+
+        }else{
+            if ($request->selectionType  == 'single'){
+                $start_date = Carbon::parse($request->datePicker)->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($request->datePicker)->endOfDay()->format('Y-m-d H:i:s');
+
+            }else{
+                $dates = explode(' to ', $request->datePicker);
+                $start_date = Carbon::parse($dates[0])->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($dates[1])->endOfDay()->format('Y-m-d H:i:s');
+            }
+
+        }
+
+        $startDate = $start_date;
+        $endDate = $end_date;
+        $data = $this->q2($request, $startDate, $endDate, $branchIds);
+        if ($request->intent == 'EXCEL') {
+            $headings = ['ROUTE', 'GROUP', 'SALESMAN', 'FREQ', 'CENTRE COUNT', 'SHOP COUNT', 'MET SHOPS', 'UNMET', 'MET CUSTOMERS %'];
+            $filename = "ROUTE MEET/UNMET REPORT $startDate - $endDate";
+            $excelData = [];
+            foreach ($data as $row) {
+
+                $payload = [
+                    'route' => $row->route,
+                    'group' => $row->group,
+                    'salesman' => $row->salesman,
+                    'freq' => $row->multiplier,
+                    'centre-count' => $row->centre_count,
+                    'Shop-count' => $row->shop_count,
+                    'met-shops' => $row->met_shops,
+                    'unmet-shops' => max($row->unmet, 0),
+                    'met-customer-percentage' => number_format(min($row->met_customers_percentage, 100), 2),
+                ];
+                $excelData[] = $payload;
+            }
+            return ExcelDownloadService::download($filename, collect($excelData), $headings);
+        }
+        return view("admin.sales_and_receivables_reports.unmet-customers", compact('title', 'model', 'breadcum', 'routes', 'data',  'start_date', 'end_date', 'branches'));
+    }
+
+    public function tonnage(Request $request)
+    {
+        $title = 'Tonnage report';
+        $model = $this->model;
+        $breadcum = ['Sales & Receivables' => '', 'Reports' => '', 'Route Performance Report' => ''];
+        $routes = Route::select('id', 'route_name')->get();
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+
+        $branches = Restaurant::where('name','like','%thika%')->get();
+        $branchIds = $branches->pluck('id')->toArray();
+
+        if(!$request->datePicker){
+            return view("admin.sales_and_receivables_reports.route_performance_tonnage", compact('title', 'model', 'breadcum', 'routes', 'branches'));
+
+        }else{
+            if ($request->selectionType  == 'single'){
+                $start_date = Carbon::parse($request->datePicker)->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($request->datePicker)->endOfDay()->format('Y-m-d H:i:s');
+
+            }else{
+                $dates = explode(' to ', $request->datePicker);
+                $start_date = Carbon::parse($dates[0])->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($dates[1])->endOfDay()->format('Y-m-d H:i:s');
+            }
+
+        }
+
+        $startDate = $start_date;
+        $endDate = $end_date;
+
+        $data = $this->q2($request, $startDate, $endDate, $branchIds);
+
+        if ($request->group) {
+            $data = $data->where('group', $request->group)->all();
+        }
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+        $data = collect($data);
+
+        if ($request->filter && $request->filter == 'tonnage') {
+            $data = $data->sortBy('tonnage', descending: true);
+        }
+        if ($request->filter && $request->filter == 'ctns') {
+            $data = $data->sortBy('ctns', descending: true);
+        }
+        if ($request->filter && $request->filter == 'dzns') {
+            $data = $data->sortBy('dzns', descending: true);
+        }
+        $totalTonnage = $data->sum('tonnage');
+        $totalCtns = $data->sum('ctns');
+        $totalDzns = $data->sum('dzns');
+
+        if ($request->intent == 'EXCEL') {
+            $headings = ['ROUTE', 'GROUP', 'SALESMAN', 'FREQ', 'CENTERS','TONNAGE','CTN','DZNS'];
+            $filename = "ROUTE TONNAGE REPORT $startDate - $endDate";
+            $excelData = [];
+            foreach ($data as $row) {
+
+                $payload = [
+                    'route' => $row->route,
+                    'group' => $row->group,
+                    'salesman' => $row->salesman,
+                    'freq' => $row->multiplier,
+                    'centers' => $row->centre_count,
+                    'target-tonnage' => number_format(($row->tonnage_target * $row->total_order_taking_days), 2),
+                    'tonnage' => number_format(($row->tonnage), 2),
+                    'tonnage-percentage' => number_format($row->tonnage_percentage, 2),
+                ];
+                $excelData[] = $payload;
+            }
+            return ExcelDownloadService::download($filename, collect($excelData), $headings);
+        }
+        return view("admin.sales_and_receivables_reports.route_performance_tonnage", compact('title', 'model', 'breadcum', 'routes', 'data', 'filterfrequency', 'totalTonnage', 'totalCtns', 'totalDzns', 'start_date', 'end_date', 'branches'));
+
+    }
+    public function cartons(Request $request)
+    {
+        $title = 'Cartons report';
+        $model = $this->model;
+        $breadcum = ['Sales & Receivables' => '', 'Reports' => '', 'Route Performance Report' => ''];
+        $routes = Route::select('id', 'route_name')->get();
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+
+        $branches = Restaurant::where('name','like','%thika%')->get();
+        $branchIds = $branches->pluck('id')->toArray();
+
+        if(!$request->datePicker){
+            return view("admin.sales_and_receivables_reports.route_performance_cartons", compact('title', 'model', 'breadcum', 'routes', 'branches'));
+
+        }else{
+            if ($request->selectionType  == 'single'){
+                $start_date = Carbon::parse($request->datePicker)->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($request->datePicker)->endOfDay()->format('Y-m-d H:i:s');
+
+            }else{
+                $dates = explode(' to ', $request->datePicker);
+                $start_date = Carbon::parse($dates[0])->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($dates[1])->endOfDay()->format('Y-m-d H:i:s');
+            }
+
+        }
+
+        $startDate = $start_date;
+        $endDate = $end_date;
+
+        $data = $this->q2($request, $startDate, $endDate, $branchIds);
+
+        if ($request->group) {
+            $data = $data->where('group', $request->group)->all();
+        }
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+        $data = collect($data);
+
+        if ($request->filter && $request->filter == 'tonnage') {
+            $data = $data->sortBy('tonnage', descending: true);
+        }
+        if ($request->filter && $request->filter == 'ctns') {
+            $data = $data->sortBy('ctns', descending: true);
+        }
+        if ($request->filter && $request->filter == 'dzns') {
+            $data = $data->sortBy('dzns', descending: true);
+        }
+        $totalTonnage = $data->sum('tonnage');
+        $totalCtns = $data->sum('ctns');
+        $totalDzns = $data->sum('dzns');
+
+        if ($request->intent == 'EXCEL') {
+            $headings = ['ROUTE', 'GROUP', 'SALESMAN', 'FREQ', 'CTN TARGET','CTN','CTN %'];
+            $filename = "ROUTE CARTON REPORT $startDate - $endDate";
+            $excelData = [];
+            foreach ($data as $row) {
+
+                $payload = [
+                    'route' => $row->route,
+                    'group' => $row->group,
+                    'salesman' => $row->salesman,
+                    'freq' => $row->multiplier,
+                    'target-ctns' => number_format(($row->ctn_target * $row->total_order_taking_days), 2),
+                    'ctns' => number_format(($row->ctns), 2),
+                    'ctns-percentage' => number_format($row->ctns_percentage, 2),
+                ];
+                $excelData[] = $payload;
+            }
+            return ExcelDownloadService::download($filename, collect($excelData), $headings);
+        }
+        return view("admin.sales_and_receivables_reports.route_performance_cartons", compact('title', 'model', 'breadcum', 'routes', 'data', 'filterfrequency', 'totalTonnage', 'totalCtns', 'totalDzns', 'start_date', 'end_date', 'branches'));
+
+    }
+    public function dozens(Request $request)
+    {
+        $title = 'Dozens report';
+        $model = $this->model;
+        $breadcum = ['Sales & Receivables' => '', 'Reports' => '', 'Route Performance Report' => ''];
+        $routes = Route::select('id', 'route_name')->get();
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+
+        $branches = Restaurant::where('name','like','%thika%')->get();
+        $branchIds = $branches->pluck('id')->toArray();
+
+        if(!$request->datePicker){
+            return view("admin.sales_and_receivables_reports.route_performance_dozens", compact('title', 'model', 'breadcum', 'routes', 'branches'));
+
+        }else{
+            if ($request->selectionType  == 'single'){
+                $start_date = Carbon::parse($request->datePicker)->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($request->datePicker)->endOfDay()->format('Y-m-d H:i:s');
+
+            }else{
+                $dates = explode(' to ', $request->datePicker);
+                $start_date = Carbon::parse($dates[0])->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($dates[1])->endOfDay()->format('Y-m-d H:i:s');
+            }
+
+        }
+
+        $startDate = $start_date;
+        $endDate = $end_date;
+
+        $data = $this->q2($request, $startDate, $endDate, $branchIds);
+
+        if ($request->group) {
+            $data = $data->where('group', $request->group)->all();
+        }
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+        $data = collect($data);
+
+        if ($request->filter && $request->filter == 'tonnage') {
+            $data = $data->sortBy('tonnage', descending: true);
+        }
+        if ($request->filter && $request->filter == 'ctns') {
+            $data = $data->sortBy('ctns', descending: true);
+        }
+        if ($request->filter && $request->filter == 'dzns') {
+            $data = $data->sortBy('dzns', descending: true);
+        }
+        $totalTonnage = $data->sum('tonnage');
+        $totalCtns = $data->sum('ctns');
+        $totalDzns = $data->sum('dzns');
+
+        if ($request->intent == 'EXCEL') {
+            $headings = ['ROUTE', 'GROUP', 'SALESMAN', 'FREQ', 'TONNAGE','TARGET DZNS TARGET','DZNS','DZNS %'];
+            $filename = "ROUTE DOZEN REPORT $startDate - $endDate";
+            $excelData = [];
+            foreach ($data as $row) {
+
+                $payload = [
+                    'route' => $row->route,
+                    'group' => $row->group,
+                    'salesman' => $row->salesman,
+                    'freq' => $row->multiplier,
+                    'dzn_target' => number_format(($row->dzn_target * $row->total_order_taking_days), 2),
+                    'dzns' => $row->dzns,
+                    'dzns_percentage' => $row->dzns_percentage,
+                ];
+                $excelData[] = $payload;
+            }
+            return ExcelDownloadService::download($filename, collect($excelData), $headings);
+        }
+        return view("admin.sales_and_receivables_reports.route_performance_dozens", compact('title', 'model', 'breadcum', 'routes', 'data', 'filterfrequency', 'totalTonnage', 'totalCtns', 'totalDzns', 'start_date', 'end_date', 'branches'));
+
+    }
+    public function returns(Request $request)
+    {
+        $title = 'Returns report';
+        $model = $this->model;
+        $breadcum = ['Sales & Receivables' => '', 'Reports' => '', 'Route Performance Report' => ''];
+        $routes = Route::select('id', 'route_name')->get();
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+
+        $branches = Restaurant::where('name','like','%thika%')->get();
+        $branchIds = $branches->pluck('id')->toArray();
+
+        if(!$request->datePicker){
+            return view("admin.sales_and_receivables_reports.route_performance_returns", compact('title', 'model', 'breadcum', 'routes', 'branches'));
+
+        }else{
+            if ($request->selectionType  == 'single'){
+                $start_date = Carbon::parse($request->datePicker)->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($request->datePicker)->endOfDay()->format('Y-m-d H:i:s');
+
+            }else{
+                $dates = explode(' to ', $request->datePicker);
+                $start_date = Carbon::parse($dates[0])->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($dates[1])->endOfDay()->format('Y-m-d H:i:s');
+            }
+
+        }
+
+        $startDate = $start_date;
+        $endDate = $end_date;
+
+        $data = $this->q2($request, $startDate, $endDate, $branchIds);
+
+        if ($request->group) {
+            $data = $data->where('group', $request->group)->all();
+        }
+        $filterfrequency = $request->has('frequency_filter') ? intval($request->frequency_filter) : null;
+        $data = collect($data);
+
+        if ($request->filter && $request->filter == 'tonnage') {
+            $data = $data->sortBy('tonnage', descending: true);
+        }
+        if ($request->filter && $request->filter == 'ctns') {
+            $data = $data->sortBy('ctns', descending: true);
+        }
+        if ($request->filter && $request->filter == 'dzns') {
+            $data = $data->sortBy('dzns', descending: true);
+        }
+        $totalTonnage = $data->sum('tonnage');
+        $totalCtns = $data->sum('ctns');
+        $totalDzns = $data->sum('dzns');
+        $totalReturns = $data->sum('returns');
+
+        if ($request->intent == 'EXCEL') {
+            $headings = ['ROUTE', 'GROUP', 'SALESMAN', 'FREQ', 'RETURNS'];
+            $filename = "ROUTE RETURNS REPORT $startDate - $endDate";
+            $excelData = [];
+            foreach ($data as $row) {
+
+                $payload = [
+                    'route' => $row->route,
+                    'group' => $row->group,
+                    'salesman' => $row->salesman,
+                    'freq' => $row->multiplier,
+                    'returns' => $row -> returns ?? 0,
+                ];
+                $excelData[] = $payload;
+            }
+            return ExcelDownloadService::download($filename, collect($excelData), $headings);
+        }
+        return view("admin.sales_and_receivables_reports.route_performance_returns", compact('title', 'totalReturns','model', 'breadcum', 'routes', 'data', 'filterfrequency', 'totalTonnage', 'totalCtns', 'totalDzns', 'start_date', 'end_date', 'branches'));
+
+    }
+
+    public function routeShifts(Request $request)
+    {
+        $title = 'Route Shifts Report';
+        $model = $this->model;
+        $breadcum = ['Sales & Receivables' => '', 'Reports' => '', 'Route Performance Report' => ''];
+
+        $branches = Restaurant::where('name','like','%thika%')->get();
+        $branchIds = $branches->pluck('id')->toArray();
+
+        if(!$request->datePicker){
+            $start_date = Carbon::now()->startOfDecade()->format('Y-m-d H:i:s');
+            $end_date = Carbon::now()->format('Y-m-d H:i:s');
+            return view("admin.sales_and_receivables_reports.shifts_report", compact('title', 'model', 'breadcum','branches'));
+
+        }else{
+            if ($request->selectionType  == 'single'){
+                $start_date = Carbon::parse($request->datePicker)->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($request->datePicker)->endOfDay()->format('Y-m-d H:i:s');
+
+            }else{
+                $dates = explode(' to ', $request->datePicker);
+                $start_date = Carbon::parse($dates[0])->startOfDay()->format('Y-m-d H:i:s');
+                $end_date = Carbon::parse($dates[1])->endOfDay()->format('Y-m-d H:i:s');
+            }
+
+        }
+        $startDate = $start_date;
+        $endDate = $end_date;
+        $routes = Route::withCount([
+            'shifts as total_shifts' => function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('created_at', [$startDate, $endDate]);
+            },
+            'shifts as onsite_shifts_count' => function ($query) use ($startDate, $endDate) {
+                $query->whereHas('firstorder', function ($query) use ($startDate, $endDate) {
+                    $query->where('shift_type', 'onsite')
+                        ->whereBetween('created_at', [$startDate, $endDate])
+                        ->orderBy('created_at', 'asc');
+                });
+            },
+            'shifts as offsite_shifts_count' => function ($query) use ($startDate, $endDate) {
+                $query->whereHas('firstorder', function ($query) use ($startDate, $endDate) {
+                    $query->where('shift_type', 'offsite')
+                        ->whereBetween('created_at', [$startDate, $endDate])
+                        ->orderBy('created_at', 'asc');
+                });
+            },
+        ])->when($request->branch, function ($q) use ($request){
+            $q->where('restaurant_id', $request->branch);
+        })->get();
+        if ($request->intent == 'EXCEL') {
+            $headings = ['ROUTE', 'TOTAL SHIFTS', 'ONSITE SHIFTS', 'OFF SITE SHIFTS', 'OFF SITE SHIFTS %'];
+            $filename = "ROUTE PERFORMANCE REPORT ON SHIFTS $startDate - $endDate";
+            $excelData = [];
+            foreach ($routes as $route) {
+                $total_shifts = $route->onsite_shifts_count + $route->offsite_shifts_count;
+                $payload = [
+                    'route' => $route->route_name,
+                    'total_shifts' => $total_shifts,
+                    'onsite_shits' => $route->onsite_shifts_count,
+                    'off_site_shits' => $route->offsite_shifts_count,
+                    'off_site_shits_%' => $total_shifts != 0 ? number_format(($route->offsite_shifts_count / $total_shifts) * 100, 2) : number_format(0, 2) ,
+                ];
+                $excelData[] = $payload;
+            }
+            return ExcelDownloadService::download($filename, collect($excelData), $headings);
+        }
+        return view("admin.sales_and_receivables_reports.shifts_report", compact('title', 'model', 'breadcum', 'routes','branches'));
+
+    }
+}

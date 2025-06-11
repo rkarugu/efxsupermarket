@@ -1,0 +1,346 @@
+
+@extends('layouts.admin.admin')
+@section('content')
+<section class="content">    
+    <div class="box box-primary">
+        <div class="box-header with-border"><h3 class="box-title"> {!! $title !!} </h3></div>
+       
+
+             <?php 
+                    $purchase_no = $row->purchase_no;
+                    $default_branch_id = $row->restaurant_id;
+                    $default_department_id = $row->wa_department_id;
+                    $purchase_date = $row->purchase_date;
+                  
+
+                   $getLoggeduserProfileName =  $row->getrelatedEmployee->name;
+
+                    ?>
+                      {!! Form::model($row, ['method' => 'PATCH','route' => [$model.'.update', $row->slug],'class'=>'validate','enctype'=>'multipart/form-data']) !!}
+            {{ csrf_field() }}
+
+              <div class = "row">
+
+                <div class = "col-sm-6">
+                 <div class = "row">
+                       <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-5 control-label">Purchase Order No.</label>
+                    <div class="col-sm-7">
+
+                   
+                        {!! Form::text('purchase_no',  $purchase_no , ['maxlength'=>'255','placeholder' => '', 'required'=>true, 'class'=>'form-control','readonly'=>true]) !!}  
+                    </div>
+                </div>
+            </div>
+                   </div>
+
+                   <div class = "row">
+                     <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-5 control-label">Employee name</label>
+                    <div class="col-sm-7">
+                        {!! Form::text('emp_name', $getLoggeduserProfileName, ['maxlength'=>'255','placeholder' => '', 'required'=>true, 'class'=>'form-control','readonly'=>true]) !!}  
+                    </div>
+                </div>
+            </div>
+
+                   </div>
+
+                   <div class = "row">
+                       <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-5 control-label">Purchase Date</label>
+                    <div class="col-sm-7">
+                        {!! Form::text('purchase_date', $purchase_date, ['maxlength'=>'255','placeholder' => '', 'required'=>true, 'class'=>'form-control','readonly'=>true]) !!}  
+                    </div>
+                </div>
+            </div>
+
+                   </div>
+                </div>
+
+
+                <div class = "col-sm-6">
+                  <div class = "row">
+                      <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-5 control-label">Branch</label>
+                    <div class="col-sm-6">
+                         {!!Form::select('restaurant_id', getBranchesDropdown(),$default_branch_id, ['class' => 'form-control ','required'=>true,'placeholder' => 'Please select branch','id'=>'branch'  ])!!} 
+                    </div>
+                </div>
+            </div>
+                  </div>
+
+                   <div class = "row">
+                      <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-5 control-label">Department</label>
+                    <div class="col-sm-6">
+                         {!!Form::select('wa_department_id',getDepartmentDropdown($default_branch_id), $default_department_id, ['class' => 'form-control ','required'=>true,'placeholder' => 'Please select department','id'=>'department'  ])!!} 
+                    </div>
+                </div>
+            </div>
+
+                   </div>
+
+                       <div class = "row">
+
+             <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-5 control-label">Supplier Name</label>
+                    <div class="col-sm-6">
+                         {!!Form::select('wa_supplier_id',getSupplierDropdown(),null, ['class' => 'form-control mlselec6t ','placeholder'=>'Please select','required'=>true,'id'=>'wa_supplier_id','disabled'=>false   ])!!} 
+                    </div>
+                </div>
+            </div>
+                     </div>
+
+                      <div class = "row">
+
+             <div class="box-body">
+                <div class="form-group">
+                    <label for="inputEmail3" class="col-sm-5 control-label">Store Location</label>
+                    <div class="col-sm-6">
+                         {!!Form::select('wa_location_and_store_id',getStoreLocationDropdown(), null, ['class' => 'form-control mlselec6t','placeholder'=>'Please select','required'=>true,'id'=>'wa_location_and_store_id' ,'disabled'=>false  ])!!} 
+                    </div>
+                </div>
+            </div>
+                     </div>
+                </div>
+              </div>
+    </div>
+
+
+
+</section>
+
+             <!-- Main content -->
+    <section class="content">
+      @include('message')
+       
+        <!-- Small boxes (Stat box) -->
+                    <div class="box box-primary">
+                        <div class="box-header with-border no-padding-h-b">
+                             
+                          
+                            <div class="col-md-12 no-padding-h">
+                              <h3 class="box-title"> Requisition Line</h3>
+
+                             
+
+                              @foreach($rows as $externalRequisition)
+                              <div class="table-responsive">
+                               <table width="100%" class="requsition_line">
+                                <tr>
+                                <td colspan="12"><b>Requisition Number:</b> {{ $externalRequisition->purchase_no}} <b>Requisition Date:</b>{{date('d/M/Y',strtotime($externalRequisition->requisition_date))}}<br>
+                                </td>
+                                </tr>
+
+                                <tr class= "makebold align_float_center">
+                                  <th>Mark</th>
+                                  <th>Item Category</th>
+                                  <th>Item Name</th>
+                                  <th>Item No</th>
+                                  <th>Standard Cost</th>
+                                 
+                                  <th>System UOM</th>
+                                  <th>System Quantity</th>
+                                  <th>Order Price</th>
+                                  <th>QOH</th>
+                                  <th>Max Stock</th>
+                                  <th>Reorder Level</th>
+                                  <th>Note</th>
+                                </tr>
+
+                                @foreach($externalRequisition->getRelatedItem as $getRelatedItem )
+                                   <tr class= "align_float_center">
+                                  <td>{{ Form::checkbox('requisition_item_row_id[]', $getRelatedItem->id, false) }}</td>
+                                  <td>{{ @$getRelatedItem->getInventoryItemDetail->getInventoryCategoryDetail->category_description  }}</td>
+                                  <td>{{ @$getRelatedItem->getInventoryItemDetail->title }}</td>
+                                  <td>{{ @$getRelatedItem->getInventoryItemDetail->stock_id_code }}</td>
+                                  <td>{{ manageAmountFormat($getRelatedItem->standard_cost) }}</td>
+                                 
+                                  <td>{{ @$getRelatedItem->getInventoryItemDetail->pack_size->title }}</td>
+
+
+
+                                  <td>
+                                    {!! Form::number('quantity_'.$getRelatedItem->id,$getRelatedItem->quantity, ['min'=>'1', 'required'=>true, 'class'=>'form-control','id'=>'quantity_'.$getRelatedItem->id,'readonly'=>true]) !!} 
+
+                                </td>
+
+
+
+
+
+                                  <td> {!! Form::number('order_price_'.$getRelatedItem->id, $getRelatedItem->standard_cost, ['min'=>'1', 'required'=>true, 'class'=>'form-control','step'=>'1','id'=>'order_price_'.$getRelatedItem->id, "step"=>"any"]) !!}  </td>
+                                 
+                                  <td></td>
+
+                                  <td></td>
+                                  <td></td>
+                                  {{-- <td> {!! Form::select('supplier_uom_id_'.$getRelatedItem->id, getUnitOfMeasureList(), @$getRelatedItem->getInventoryItemDetail->pack_size->id, ['class'=>'form-control ','id'=>'supplier_uom_id_'.$getRelatedItem->id,'required'=>true]) !!}  
+
+
+                                  </td>
+                                  <td> {!! Form::number('supplier_quantity_'.$getRelatedItem->id,$getRelatedItem->quantity, ['min'=>'1', 'required'=>true, 'class'=>'form-control supplier_quantity','id'=>'supplier_quantity_'.$getRelatedItem->id,'data-attr'=>$getRelatedItem->id]) !!}  </td>
+
+
+                                  <td>{!! Form::number('unit_conversion_'.$getRelatedItem->id, 1, ['min'=>'1', 'required'=>true, 'class'=>'form-control unit_conversion','id'=>'unit_conversion_'.$getRelatedItem->id,'data-attr'=>$getRelatedItem->id]) !!}  </td>
+                                  --}}
+                                  <td>
+                                    <input type = "text" name = "note_{{ $getRelatedItem->id }}" value = "{{ $getRelatedItem->note }}" class="form-control" id = "note_{{ $getRelatedItem->id }}">
+                                  </td>
+                                </tr>
+
+                                @endforeach
+
+                                 </table>
+                                 </div>
+                              @endforeach
+
+                               <br><br>
+
+                              <div class="col-md-12">
+                              <div class="col-md-4"><span>
+                             
+
+                              <button type="submit" class="btn btn-success" >Submit</button>
+                              </span></div>
+                              <div class="col-md-3">
+                          
+                              </div>
+                               <div class="col-md-3"></div>
+                              <div class="col-md-2"></div>
+                              </div>
+                             
+
+                           
+                            </div>
+                       
+
+
+
+                               
+                        </div>
+                    </div>
+                    </form>
+
+
+    </section>
+
+
+    <!-- Modal -->
+
+
+  
+
+@endsection
+
+@section('uniquepagestyle')
+
+<link href="{{asset('assets/admin/bower_components/select2/dist/css/select2.min.css')}}" rel="stylesheet" />
+ <link rel="stylesheet" href="{{asset('assets/admin/dist/datepicker.css')}}">
+
+ <style type="text/css">
+   .select2{
+    width: 100% !important;
+   }
+   #last_total_row td {
+  border: none !important;
+}
+ #note{
+    height: 60px !important;
+   }
+   .align_float_right
+{
+  text-align:  right;
+}
+.requsition_line
+  {
+    border-right: 1px solid #e0e0e0;
+    margin-top: 10px;
+
+  }
+  
+  .makebold{
+    font-weight: bold;
+  }
+       .align_float_right
+{
+  text-align:  right;
+}
+     .align_float_center
+{
+  text-align:  center;
+}
+
+.requsition_line input,select
+  {
+    width: 95%;
+    margin:auto !important;
+  }
+table.requsition_line th, table.requsition_line td{
+  font-size: 12px;
+  border: 1px solid #e0e0e0;
+  padding: 4px;
+}
+.dataTables_wrapper table th, td{
+  border-right: none !important;
+}
+
+ </style>
+@endsection
+
+@section('uniquepagescript')
+<script src="{{asset('assets/admin/bower_components/select2/dist/js/select2.full.min.js')}}"></script>
+  <script type="text/javascript">
+    $(function () {
+      $(".mlselec6t").select2();
+     
+     
+});
+
+
+
+    $(".unit_conversion,.supplier_quantity").on("keyup", function (e) {
+      manageSystemQuantity($(this));
+    });
+
+   $(".unit_conversion,.supplier_quantity").change(function (e) {
+      manageSystemQuantity($(this));
+    });
+
+         function manageSystemQuantity(field_attr)
+   {  
+
+    var field_id = field_attr.attr('data-attr');
+      var unit_conversion =   $("#unit_conversion_"+field_id).val();
+      var supplier_quantity =   $("#supplier_quantity_"+field_id).val();
+      var quantity = null;
+      if(unit_conversion && supplier_quantity)
+      {
+        quantity = unit_conversion*supplier_quantity;
+      }
+
+      $("#quantity_"+field_id).val(quantity);
+   }
+
+
+
+
+
+  
+
+</script>
+<script src="{{asset('assets/admin/dist/bootstrap-datepicker.js')}}"></script>
+    <script>
+        $('.datepicker').datepicker({
+        format: 'yyyy-mm-dd'
+        });
+    </script>
+@endsection
+
+

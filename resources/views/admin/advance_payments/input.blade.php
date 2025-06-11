@@ -1,0 +1,1 @@
+<input type="radio" name="lpo" id="lpo{{ $lpo->id }}" value="{{ $lpo->id }}" data-rule-required="true">

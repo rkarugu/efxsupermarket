@@ -1,0 +1,534 @@
+
+@extends('layouts.admin.admin')
+
+@section('content')
+   <?php 
+	   $totalamount = []; //echo "<pre>"; print_r($depoitelist); die; 	                                   
+	   $paymentmethodtotal = []; //echo "<pre>"; print_r($depoitelist); die; 	                                   
+   ?>
+    @foreach($mydebtorlist as $key=> $val)
+    <?php $totalamount[] = abs($val->balance); ?>
+     @endforeach
+
+     @foreach($depoitelist as $key=> $val)
+    <?php $paymentmethodtotal[] = abs($val->amount); ?>
+     @endforeach
+
+
+    <!-- Main content -->
+    <section class="content">
+        <!-- Small boxes (Stat box) -->
+                    <div class="box box-primary">
+                        <div class="box-header with-border no-padding-h-b">
+                        <div  style="height: 150px ! important;"> 
+                            <div class="card-header">
+                            <i class="fa fa-filter"></i> Filter
+                            </div><br>
+                            {!! Form::open(['route' => 'sales-and-receivables-reports.shift-summary','method'=>'GET']) !!}
+                           
+
+                            <div>
+                            <div class="col-md-12 no-padding-h">
+ 
+                            <div class="col-sm-3">
+                            <div class="form-group">
+                            {!!Form::select('salesman_id', getAllsalesmanList(), null, ['placeholder'=>'Select Salesman', 'class' => 'form-control mlselect getshiftdata allsalesman_id'  ])!!}
+                            </div>
+                            </div>
+ 
+                            <div class="col-sm-5">
+                            <div class="form-group">
+                            {!!Form::select('shift_id[]', getAllShiftList(), null, ['placeholder'=>'Select Shift', 'class' => 'form-control  mlselec6t shiftList', 'multiple'=>'multiple'  ])!!}
+                            </div>
+                            </div> 
+
+                            </div>
+
+                            <div class="col-md-12 no-padding-h">
+                                 <div class="col-sm-1"><button type="submit" class="btn btn-success" name="manage-request" value="filter"  >Filter</button></div>
+
+                                 <div class="col-sm-1"><button type="submit" class="btn btn-warning" name="manage-request" value="pdf"><i class="fa fa-file-pdf"></i></button></div>
+                                 <div class="col-sm-1"><button type="button" class="btn btn-primary" onclick="printgrn(this);return false;" name="manage-request" value="print"><i class="fa fa-file-pdf"></i></button></div>
+
+                             <div class="col-sm-2">
+                        </div>
+                                
+                            </div>
+                            </div>
+
+                            </form>
+                          </div>
+                                
+                        </div>
+                        </div>
+    </section>
+    <form action="{{route('sales-and-receivables-reports.depoitelistProcess')}}" method="POST">
+                            <section class="content">
+                              <!-- Small boxes (Stat box) -->
+                                          <div class="box box-primary">
+                                              <div class="box-header with-border no-padding-h-b">
+                                              <div  style="height: 150px ! important;"> 
+							<?php
+						       $account_codes =  getChartOfAccountsList();
+						       $totalexp = 0;
+							?>
+
+ 							   @foreach($expenseList as $val)
+							   	<?php 
+								   	$totalexp += $val->amount;
+							   	?>
+							   	@endforeach
+
+                           <div class="col-sm-12 no-padding-h">
+	                           <div class="col-sm-12 no-padding-h">
+							   		<b style="border-top:1px solid; padding:10px 0px;">Salesman Name :@if(isset($salesmanname)) {{ $salesmanname}} @endif </b>
+							   		<br/>
+		                           <b >Shift Name : {{(isset($shiftData) && count($shiftData) >0) ? implode(",",$shiftData) : '.................' }}</b><br />
+	                           <div class="row">
+		                           @if(isset($shiftdata))
+	                           <div class="col-sm-12 no-padding-h">
+		                           <b >Route : {{($shiftdata->route!="")?$shiftdata->route:'-------' }}</b> 
+	                           </div> 
+	                          
+	                           @endif
+	                           </div> 
+	            
+	                           </div> 
+                           </div> 
+                           <div class="col-sm-12">
+	                           <div class="col-sm-8">
+
+	                           </div> 
+	                           <div class="col-sm-4">
+							   	<b>Amount</b><br>
+							   	<div style="border-top:1px solid; border-bottom:1px solid;">
+                    {{manageAmountFormat(abs($totalAmnt))}}
+							   	</div>
+							   	
+	                           </div> 
+
+
+                           </div> 
+
+                           <div class="col-sm-12">
+	                           <div class="col-sm-8">
+							   <b>EXPENSES</b><br>
+							   @foreach($expenseList as $val)
+                 <table class="table table-bordered">
+                  <tr>
+                    <th width="20%"  >Bank Deposited</th>
+                    <th width="20%"  >Date of Transaction</th>
+                    <th width="40%"  >Ref No.</th>
+                    <th width="40%"  >Description</th>
+                    <th width="30%"  >Amount</th>
+                  </tr>
+                  <tr>     
+                    <td>
+                      <div class="form-check">
+                        <label class="form-check-label">
+                          @if($val->is_posted_to_account == 0)
+                          <input type="checkbox" class="form-check-input posted_to_account_value_check" data-id="posted_to_account_value_{{$val->id}}" onclick='posted_to_account();' name="posted_to_account[{{$val->id}}]"  value="{{$val->id}}" >
+                          <input type="hidden" class="posted_to_account_value" value="{{abs($val->amount)}}">
+                          @endif
+                          {{ isset($account_codes[$val->account]) ? $account_codes[$val->account] : '' }}
+                        </label>
+                      </div>
+                      </td>                                      
+                    <td>{{ $val->trans_date }} - {{ $val->id }}</td>                                      
+                    <td>{{ strtoupper($val->narrative) }}
+                      @if($val->account=="12004")
+                      | 
+                      <a href="#" data-toggle="modal" data-target=".bd-example-modal-lg{{$key}}"><i class="fa fa-eye"></i></a>
+    <div class="modal fade bd-example-modal-lg{{$key}}" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+        <div class="modal-header">
+        <h5 class="modal-title">Cheque Image</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+           @if($val->cheque_image!="") 														
+                <img src="{{URL::to($val->cheque_image)}}" width="250px" />
+            @else
+            No cheque found.
+            @endif  
+        </div>
+        </div>
+      </div>
+    </div>
+
+                      @endif
+                    </td>                                      
+                    <td>{{ ($val->reference) }}</td>                                      
+                     <td>{{ manageAmountFormat(abs($val->amount)) }}</td>  
+                  </tr>
+                 </table>
+							   
+ 							   	@endforeach
+							   	-–––––––––––––––––––––--------
+							   	<p><b>TOTAL EXPENSES - {{manageAmountFormat($totalexp)}}</b> </p>
+							   	-–––––––––––––––––––––--------
+	                           </div> 
+	                           <div class="col-sm-4">
+ 							   	
+	                           </div> 
+                           </div> 
+
+                        </div>
+                           <div class="col-sm-12">
+	                           <div class="col-sm-8">
+
+	                           </div> 
+
+	                           <div class="col-sm-4">
+							   	<b>Net Sales</b><br>
+							   	<div style="border-top:1px solid; border-bottom:1px solid;">
+                    {{manageAmountFormat(abs($totalAmnt) - abs($totalexp))}}
+                    
+							   	</div>
+							   	
+	                           </div> 
+                           </div> 
+                            
+                            <br>
+                            @include('message')
+                            <div class="col-md-12 no-padding-h">
+                            
+                                {{csrf_field()}}
+                                <input type="hidden" name="salesman_id" value="{{@request()->salesman_id}}">
+                                <table class="table table-bordered table-hover">
+                                    <thead>
+                                    <tr>
+                                      
+                                        <th width="20%"  >Bank Deposited</th>
+                                         <th width="20%"  >Date of Transaction</th>
+                                         <th width="40%"  >Ref No.</th>
+                                         <th width="40%"  >Description</th>
+                                         <th width="30%"  >Amount</th>
+                                        
+                                    </tr>
+                                     </thead>
+                                    <tbody>
+                                   <?php $total_amount = []; //echo "<pre>"; print_r($depoitelist); die; 
+	                                   
+                                   ?>
+	                                 @foreach($depoitelist as $key=> $val)
+                                   <tr>     
+                                      <td>
+                                        <div class="form-check">
+                                          <label class="form-check-label">
+                                            @if($val->is_posted_to_account == 0)
+                                            <input type="checkbox" class="form-check-input posted_to_account_value_check" data-id="posted_to_account_value_{{$val->id}}" onclick='posted_to_account();' name="posted_to_account[{{$val->id}}]"  value="{{$val->id}}" >
+                                            <input type="hidden" class="posted_to_account_value" value="{{abs($val->amount)}}">
+                                            @endif
+                                            {{ isset($account_codes[$val->account]) ? $account_codes[$val->account] : '' }}
+                                          </label>
+                                        </div>
+                                        </td>                                      
+                                      <td>{{ $val->trans_date }} - {{ $val->id }}</td>                                      
+                                      <td>{{ strtoupper($val->narrative) }}
+	                                      @if($val->account=="12004")
+	                                      | 
+	                                      <a href="#" data-toggle="modal" data-target=".bd-example-modal-lg{{$key}}"><i class="fa fa-eye"></i></a>
+											<div class="modal fade bd-example-modal-lg{{$key}}" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel" aria-hidden="true">
+											  <div class="modal-dialog modal-lg">
+											    <div class="modal-content">
+													<div class="modal-header">
+													<h5 class="modal-title">Cheque Image</h5>
+													<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+													  <span aria-hidden="true">&times;</span>
+													</button>
+													</div>
+													<div class="modal-body" style="text-align: center;">
+ 														@if($val->cheque_image!="") 														
+													        <img src="{{URL::to($val->cheque_image)}}" width="250px" />
+													    @else
+													    No cheque found.
+													    @endif  
+													</div>
+											    </div>
+											  </div>
+											</div>
+
+	                                      @endif
+                                      </td>                                      
+                                      <td>{{ ($val->reference) }}</td>                                      
+                                       <td>{{ manageAmountFormat(abs($val->amount)) }}</td>  
+                                    </tr>
+                                    <?php $total_amount[] = abs($val->amount); ?>
+                                     @endforeach
+                                    </tbody>
+ 
+                                    <tfoot style="font-weight: bold;">
+                                      <tr>
+                                        <td>Grand Total</td>
+                                        <td> </td>
+                                        <td> </td>
+                                        <td> </td>
+                                        <td>{{ manageAmountFormat(array_sum($total_amount)) }}</td>
+                                      </tr>
+                                      <tr>
+                                        <td colspan="3" style="text-align: right">Total Amount: <span id="posted_to_account_value_total">0.00</span></td>
+                                        <td colspan="2">
+                                        <button type="submit" class="btn btn-danger">Post To Account</button>  
+                                        </td>
+                                      </tr>
+
+                                    </tfoot>
+
+                                </table>
+                             
+                            </div>
+
+                                    </div>
+
+
+                    <div class="box box-primary">
+                        <div class="box-header with-border no-padding-h-b">
+	                        <div  style="height: 150px ! important;"> 
+	                         <div>
+ 
+                           <div class="col-sm-12">
+	                            <h4>Debtors</h4>
+
+                            </div> 
+                            
+                            <br>
+                            
+                            <div class="col-md-12 no-padding-h">
+                                <table class="table table-bordered table-hover">
+                                    <thead>
+                                    <tr>
+                                      
+                                        <th width="20%"  >Sr. No.</th>
+                                         <th width="20%"  >Customer Name</th>
+                                         <th width="40%"  >Reference</th>
+                                         <th width="40%"  >Transaction Date</th>
+                                         <th width="30%"  >Balance</th>
+                                        
+                                    </tr>
+                                     </thead>
+                                    <tbody>
+                                   <?php $total_amount = []; //echo "<pre>"; print_r($depoitelist); die; 
+	                                   
+                                   ?>
+	                                 @foreach($mydebtorlist as $key=> $val)
+                                   <tr>     
+                                      <td>{{ $key+1 }}</td>                                      
+                                      <td>{{ $val->customer_name }}</td>                                      
+                                      <td>{{ $val->reference }}
+                                       </td>                                      
+                                      <td>{{ $val->trans_date }}</td>                                      
+                                       <td>{{ manageAmountFormat($val->balance) }}</td>  
+                                    </tr>
+                                    <?php $total_amount[] = abs($val->balance); ?>
+                                     @endforeach
+                                    </tbody>
+ 
+                                    <tfoot style="font-weight: bold;">
+                                      <td>Grand Total</td>
+                                      <td> </td>
+                                      <td> </td>
+                                      <td> </td>
+                                      <td>{{ manageAmountFormat(array_sum($total_amount)) }}</td>
+
+                                    </tfoot>
+
+                                </table>
+                            </div>
+
+
+                         </div>
+                    </div>
+
+                        </div>
+                    </div>
+
+                    <!-- Return  -->
+
+
+                    <div class="box box-primary">
+                      <div class="box-header with-border no-padding-h-b">
+                        <div  style="height: 150px ! important;"> 
+	                        <div> 
+                           <div class="col-sm-12">
+	                            <h4>Returns</h4>
+                            </div>                             
+                            <br>
+                            
+                            <div class="col-md-12 no-padding-h">
+                              <table class="table table-bordered table-hover">
+                                <thead>
+                                  <tr>                                    
+                                      <th>Return No</th>
+                                      <th>Date Returned</th>
+                                      <th>Item Code</th>
+                                      <th>Item Description</th>
+                                      <th>Qty</th>                                      
+                                      <th>Amount</th>                                      
+                                      <th>Total Amount</th>                                      
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <?php $total_amount = []; ?>
+                                  @foreach($returns as $key=> $val)
+                                  <tr>     
+                                    <td>{{ $val->return_date }}</td>                                      
+                                    <td>{{ date('d/m/Y',strtotime($val->return_date)) }}</td>                                      
+                                    <td>{{ @$val->getInventoryItemDetail->stock_id_code }}</td>                                      
+                                    <td>{{ @$val->getInventoryItemDetail->title }}</td>                                      
+                                    <td>{{ manageAmountFormat(@$val->return_quantity) }}</td>                                      
+                                    <td>{{ manageAmountFormat(@$val->selling_price) }}</td> 
+                                    <td>{{ manageAmountFormat($val->return_quantity * $val->selling_price) }}</td>  
+                                  </tr>
+                                  <?php $total_amount[] = abs($val->return_quantity * $val->selling_price); ?>
+                                  @endforeach
+                                </tbody>
+ 
+                                <tfoot style="font-weight: bold;">
+                                  <td colspan="6">Grand Total</td>
+                                  <td>{{ manageAmountFormat(array_sum($total_amount)) }}</td>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Return End -->
+
+                    <div class="box box-primary">
+                      <div class="box-header with-border no-padding-h-b">
+                        <div  style="height: 150px ! important;"> 
+	                        <div> 
+                           <div class="col-sm-12">
+	                            <h4>Unmerged Transactions</h4>
+                            </div>                             
+                            <br>
+                            
+                            <div class="col-md-12 no-padding-h">
+                              <table class="table table-bordered table-hover">
+                                <thead>
+                                  <tr>                                    
+                                      <th>Shift</th>                                    
+                                      <th>Total Amount</th>                                      
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <?php $total_amount = []; ?>
+                                  @foreach($unmerged_trans as $key=> $val)
+                                  <tr>      
+                                    <td>{{ $val->shift	 }}</td>   
+                                    <td>{{ manageAmountFormat(abs($val->amount)) }}</td>  
+                                  </tr>
+                                  <?php $total_amount[] = abs($val->amount); ?>
+                                  @endforeach
+                                </tbody>
+ 
+                                <tfoot style="font-weight: bold;">
+                                  <td colspan="1">Grand Total</td>
+                                  <td>{{ manageAmountFormat(array_sum($total_amount)) }}</td>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+    </section>
+
+  </form>
+  
+@endsection
+
+
+@section('uniquepagestyle')
+  <link rel="stylesheet" href="{{asset('assets/admin/dist/datepicker.css')}}">
+<link href="{{asset('assets/admin/bower_components/select2/dist/css/select2.min.css')}}" rel="stylesheet" />
+@endsection
+@section('uniquepagescript')
+<script type="text/javascript">
+      function posted_to_account(){
+        
+        var posted_to_account_value = $('.posted_to_account_value_check:checked');
+        var t = 0;
+        $.each(posted_to_account_value, function () { 
+           t = parseFloat(t)+parseFloat($(this).parents('tr').find('.posted_to_account_value').val());
+        });
+        $('#posted_to_account_value_total').html((t).toFixed(2));
+      }
+       function printgrn(input)
+       {
+        var postData = new FormData($(input).parents('form')[0]);
+			var url = $(input).parents('form').attr('action');
+      postData.append('_token','{{csrf_token()}}');
+      postData.append('manage-request','print');
+      
+
+            jQuery.ajax({
+                url: url,
+                 type: 'POST',
+                 contentType: false,
+                cache: false,
+                processData: false,
+                data:postData,
+              success: function (response) {
+               
+                var divContents = response;
+                //alert(divContents);
+                var printWindow = window.open('', '', 'width=600');
+                printWindow.document.write(divContents);
+                printWindow.document.close();
+                printWindow.print();
+                printWindow.close();
+              }
+            });
+       }
+   </script>
+<script src="{{asset('assets/admin/dist/bootstrap-datepicker.js')}}"></script>
+<script src="{{asset('assets/admin/bower_components/select2/dist/js/select2.full.min.js')}}"></script>
+<script type="text/javascript">
+    $(function () {
+   
+    $(".mlselect").select2();
+});
+$(document).ready(function(){
+  $(".getshiftdata").change(function(){
+	  var salesmanId = $(this).val();
+    $.ajax({
+	    url: "{{route('sales-and-receivables-reports.getShiftBySalesman')}}",
+	    dataType:"JSON", 
+	    data:{'_token':"{{csrf_token()}}",salesman_id:salesmanId,'shift_summary':'1'},
+	    success: function(result){
+		    $('.shiftList').html('');
+			$.each(result, function (key, val) {
+		    $('.shiftList').append('<option value="'+key+'">'+val+'</option>');
+			});
+//			$("#div1").html(result);
+    	}});
+  });
+});
+
+    $(function () {
+	    		$(".mlselec6t").select2({
+			closeOnSelect : false,
+		});
+//        $(".mlselec6t").select2();
+    });
+
+</script>
+
+<script>
+            
+
+      $('.datepicker').datepicker({
+        format: 'yyyy-mm-dd'
+        });
+</script>
+
+
+@endsection

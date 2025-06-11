@@ -1,0 +1,1 @@
+<input type="checkbox" name="orders[]" id="order{{ $order->id }}" value="{{ $order->id }}" data-rule-required="true">

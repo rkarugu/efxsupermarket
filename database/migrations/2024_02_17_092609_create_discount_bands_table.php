@@ -1,0 +1,36 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('discount_bands', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('inventory_item_id'); 
+            $table->foreign('inventory_item_id')->references('id')->on('wa_inventory_items')->onDelete('cascade');
+            $table->integer('sale_quantity');
+            $table->decimal('discount_amount',8,2);
+            $table->unsignedInteger('initiated_by'); 
+            $table->foreign('initiated_by')->references('id')->on('users');
+            $table->unsignedInteger('approved_by'); 
+            $table->foreign('approved_by')->references('id')->on('users')->nullable();
+            $table->string('status')->default('PENDING');
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('discount_bands');
+    }
+};

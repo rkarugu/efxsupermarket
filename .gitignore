@@ -1,0 +1,12 @@
+/demo
+/storage/debugbar
+/public/storage
+# Temporarily allowing logs for debugging
+# /storage/*.key
+.env
+.idea/
+.vscode/
+/public/hot
+/public/build
+node_modules/
+storage/logs/laravel.log

@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('new_fuel_entries', function (Blueprint $table) {
+            $table->unsignedBigInteger('fueling_station_id');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('new_fuel_entries', function (Blueprint $table) {
+            $table->dropColumn('fueling_station_id');
+        });
+    }
+};

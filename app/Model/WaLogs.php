@@ -1,0 +1,16 @@
+<?php
+
+namespace App\Model;
+
+use Illuminate\Database\Eloquent\Model;
+
+class WaLogs extends Model
+{
+    protected $table = 'wa_logs';
+
+    public function user()
+    {
+        return $this->belongsTo(User::class,'user_id');
+    }
+    
+}

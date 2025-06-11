@@ -1,0 +1,522 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Model\WaDebtorTran;
+use App\Services\ExcelDownloadService;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
+
+class BankReconciliationController extends Controller
+{
+    protected string $model = 'bank-reconciliation';
+    protected string $permission_module = 'bank-reconciliation';
+    protected string $base_folder = 'admin.bank_reconciliation';
+    protected string $base_route = 'bank-reconciliation';
+
+    protected float $systemTotal = 0;
+    protected int $systemCount = 0;
+
+    protected float $bankCount = 0;
+    protected float $bankTotal = 0;
+
+    protected array $reconciledTransactions = [];
+    protected float $reconciledTotal = 0;
+
+    protected array $missingTransactions = [];
+    protected float $missingTotal = 0;
+
+    protected array $mibTransactions = [];
+    protected float $mibTotal = 0;
+
+    protected array $flaggedTransactions = [];
+    protected float $flaggedTotal = 0;
+
+    protected array $ignoredTransactions = [];
+    protected float $ignoredTotal = 0;
+
+    protected array $notReconciled = [];
+    protected array $doubles = [];
+
+    public function index(Request $request)
+    {
+        DB::beginTransaction();
+        try {
+            ini_set('max_execution_time', 600);
+
+            if (!can('view', $this->permission_module)) {
+                Session::flash(pageRestrictedMessage());
+                return redirect()->route('admin.dashboard');
+            }
+
+            $title = 'Bank Reconciliation';
+            $model = $this->model;
+            $breadcum = [$title => route("$this->base_route.index"), 'Initiate' => ''];
+            $banks = [
+                [
+                    'label' => 'EQUITY BANK',
+                    'value' => 'equity'
+                ],
+                [
+                    'label' => 'KCB BANK',
+                    'value' => 'kcb'
+                ]
+            ];
+
+            $allRoutes = DB::table('routes')->select('route_name', 'customer_name', 'equity_till', 'kcb_till')
+                ->join('wa_customers', 'routes.id', '=', 'wa_customers.route_id')
+                ->get();
+
+            $dataProcessed = false;
+            if ($request->intent == 'Process') {
+                $dataProcessed = true;
+
+                $start = Carbon::parse('2024-03-06')->startOfDay();
+                $end = Carbon::parse('2024-04-12')->endOfDay();
+                $debtorTrans = DB::table('wa_debtor_trans')
+                    ->where('reconciled', false)
+                    ->whereBetween('wa_debtor_trans.created_at', [$start, $end])
+                    ->select(
+                        'wa_debtor_trans.id',
+                        'wa_debtor_trans.trans_date',
+                        'wa_debtor_trans.input_date',
+                        'wa_debtor_trans.reference',
+                        'wa_debtor_trans.amount',
+                        'wa_debtor_trans.document_no',
+                        'wa_customers.customer_name',
+                    )
+                    ->join('wa_customers', 'wa_debtor_trans.wa_customer_id', '=', 'wa_customers.id')
+                    ->where('document_no', 'like', '%RCT%')
+                    ->orWhere('document_no', 'like', '%JV%')
+                    ->get()->map(function ($record) {
+                        $record->amount = abs($record->amount);
+                        return $record;
+                    });
+
+                $this->systemTotal = $debtorTrans->sum('amount');
+                $this->systemCount = $debtorTrans->count();
+
+
+                $mpesaReader = new Xlsx();
+                $mpesaReader->setReadDataOnly(false);
+
+                $ebReader = new Xlsx();
+                $ebReader->setReadDataOnly(false);
+
+                $kcbReader = new Xlsx();
+                $kcbReader->setReadDataOnly(false);
+
+                if ($request->mpesa_upload_file) {
+                    $fileName = $request->file('mpesa_upload_file');
+                    $spreadsheet = $mpesaReader->load($fileName);
+                    $data = $spreadsheet->getActiveSheet()->toArray();
+
+                    $this->processMpesaPayments($data, $debtorTrans);
+                }
+
+                if ($request->equity_upload_file) {
+                    $fileName = $request->file('equity_upload_file');
+                    $spreadsheet = $ebReader->load($fileName);
+                    $data = $spreadsheet->getActiveSheet()->toArray();
+
+                    $this->processEquityPayments($data, $debtorTrans, $allRoutes);
+                }
+
+                if ($request->kcb_upload_file) {
+                    $fileName = $request->file('kcb_upload_file');
+                    $spreadsheet = $kcbReader->load($fileName);
+                    $data = $spreadsheet->getActiveSheet()->toArray();
+
+                    $this->processKcbPayments($data, $debtorTrans);
+                }
+            }
+
+
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            $dataProcessed = false;
+            Session::flash('warning', $e->getMessage() . "=====" . $e->getTraceAsString());
+        }
+
+$selectedBank = $request->bank;
+            $selectedStartDate = $request->start_date;
+            $selectedEndDate = $request->end_date;
+
+        return view("$this->base_folder.index", [
+            'title' => $title,
+            'breadcum' => $breadcum,
+            'model' => $model,
+            'banks' => $banks,
+            'dataProcessed' => $dataProcessed,
+            'selectedStartDate' => $selectedStartDate,
+            'selectedEndDate' => $selectedEndDate,
+            'selectedBank' => $selectedBank,
+            'systemTotal' => $this->systemTotal,
+            'systemCount' => $this->systemCount,
+            'bankTotal' => $this->bankTotal,
+            'bankCount' => $this->bankCount,
+            'reconciledTotal' => $this->reconciledTotal,
+            'reconciledTransactions' => $this->reconciledTransactions,
+            'missingTotal' => $this->missingTotal,
+            'missingTransactions' => $this->missingTransactions,
+            'ignoredTotal' => $this->ignoredTotal,
+            'ignoredTransactions' => $this->ignoredTransactions,
+            'flaggedTotal' => $this->flaggedTotal,
+            'flaggedTransactions' => $this->flaggedTransactions,
+            'notReconciled' => $this->notReconciled,
+            'doubles' => $this->doubles,
+        ]);
+    }
+
+    private function processMpesaPayments($data, $debtorTrans): void
+    {
+        $mpesaPayments = DB::table('invoice_payments')
+            ->select('wa_internal_requisitions.route', 'invoice_payments.payment_reference')
+            ->where('paid_amount', '>', 0)
+            ->leftJoin('wa_internal_requisitions', 'invoice_payments.order_id', '=', 'wa_internal_requisitions.id')
+            ->get();
+        foreach ($data as $index => $record) {
+            if ($index != 0) {
+                $recordAmount = (float)$record[5];
+                $this->bankTotal += $recordAmount;
+                $this->bankCount += 1;
+
+                $lookupRef = $record[6];
+                $dts = $debtorTrans->filter(function ($_dt) use ($lookupRef) {
+                    return str_contains($_dt->reference, $lookupRef);
+                });
+
+                if (count($dts) > 0) {
+                    if (count($dts) > 1) {
+                        $record[] = 'Potential duplicate entries';
+                        $this->notReconciled[] = $record;
+
+                        $this->flaggedTotal += $recordAmount;
+                        $paymentRecord = $mpesaPayments->where('payment_reference', $lookupRef)->first();
+                        $this->flaggedTransactions[] = [
+                            'bank_ref' => $lookupRef,
+                            'amount' => $recordAmount,
+                            'bank_date' => $record[0],
+                            'route' => $paymentRecord?->route ?? '-',
+                            'comments' => "Double entries",
+                        ];
+                    } else {
+                        $dt = $dts->first();
+                        if ((float)$dt->amount == $recordAmount) {
+                            $dt->bank_ref = $lookupRef;
+                            $dt->bank_date = $record[0];
+
+                            $this->reconciledTotal += $dt->amount;
+                            $this->reconciledTransactions[] = $dt;
+
+                            // Mark reconciled
+                            WaDebtorTran::find($dt->id)->update(['reconciled' => true]);
+                        } else {
+                            $record[] = 'One match, amount mismatch';
+                            $this->notReconciled[] = $record;
+
+                            $this->flaggedTotal += $recordAmount;
+                            $paymentRecord = $mpesaPayments->where('payment_reference', $lookupRef)->first();
+                            $this->flaggedTransactions[] = [
+                                'bank_ref' => $lookupRef,
+                                'amount' => $recordAmount,
+                                'bank_date' => $record[0],
+                                'route' => $paymentRecord?->route ?? '-',
+                                'comments' => "Amount Mismatch",
+                            ];
+                        }
+                    }
+                } else {
+                    $record[] = 'Missing In System';
+                    $this->notReconciled[] = $record;
+
+                    $this->missingTotal += $recordAmount;
+
+                    $paymentRecord = $mpesaPayments->where('payment_reference', $lookupRef)->first();
+                    $this->missingTransactions[] = [
+                        'bank_ref' => $lookupRef,
+                        'amount' => $recordAmount,
+                        'bank_date' => $record[0],
+                        'route' => $paymentRecord?->route ?? '-',
+                        'comments' => "Missing in System",
+                    ];
+                }
+            }
+        }
+    }
+
+    private function processEquityPayments($data, $debtorTrans, $allRoutes): void
+    {
+        foreach ($data as $index => $record) {
+            if ($index != 0) {
+                $recordAmount = (float)$record[5];
+                $this->bankTotal += $recordAmount;
+                $this->bankCount += 1;
+
+                $refColumn = $record[2];
+                $mode = substr($refColumn, 0, 2);
+                switch ($mode) {
+                    case 'MP':
+                        $refColumnContent = explode(' ', $refColumn);
+                        $lookupRef = $refColumnContent[2] ?? null;
+                        break;
+
+                    case 'EA':
+                        $refColumnContent = explode('/', $refColumn);
+                        $lookupRef = $refColumnContent[4] ?? null;
+                        break;
+
+                    case 'Cr':
+                    case 'CR':
+                        $refColumnContent = explode(' ', $refColumn);
+                        $lookupRef = $refColumnContent[4];
+                        break;
+
+                    case 'US':
+                        $refColumnContent = explode('/', $refColumn);
+                        $lookupRef = $refColumnContent[2] ?? null;
+                        break;
+
+                    case 'AP':
+                        $refColumnContent = explode('/', $refColumn);
+                        $lookupRef = $refColumnContent[2];
+                        break;
+
+                    default:
+                        $lookupRef = null;
+                }
+
+                if (($lookupRef == null) || (strlen($lookupRef) < 5)) {
+                    $record[] = 'Unknown/short lookup reference';
+                    $this->notReconciled[] = $record;
+
+                    $this->ignoredTotal += $recordAmount;
+                    $this->ignoredTransactions[] = [
+                        'bank_ref' => $refColumn,
+                        'amount' => $recordAmount,
+                        'bank_date' => $record[1],
+                        'route' => '-',
+                        'comments' => "Unknown Lookup Code/Missing Ref",
+                    ];
+                } else {
+                    $dts = $debtorTrans->filter(function ($_dt) use ($lookupRef) {
+                        return str_contains($_dt->reference, $lookupRef) || str_contains($lookupRef, $_dt->reference);
+                    });
+
+
+                    if (count($dts) > 0) {
+                        if (count($dts) > 1) {
+                            // Check amount
+                            $amountDts = collect($dts->all())->filter(function ($_dt) use ($recordAmount) {
+                                return (float)$_dt->amount == $recordAmount;
+                            });
+
+                            if (count($amountDts) > 1) {
+                                $record[] = 'Potential duplicate entries';
+                                $this->notReconciled[] = $record;
+                                foreach ($amountDts as $dt) {
+                                    $dt->bank_ref = $record[2] . "($recordAmount)";
+                                    $this->doubles[] = $dt;
+                                }
+
+                                $this->flaggedTotal += $recordAmount;
+                                $this->flaggedTransactions[] = [
+                                    'bank_ref' => $lookupRef,
+                                    'amount' => $recordAmount,
+                                    'bank_date' => $record[0],
+                                    'route' => '-',
+                                    'comments' => "Double entries",
+                                ];
+                            } else {
+                               if (count($amountDts) == 0) {
+                                   $record[] = 'Duplicate, amount mismatch';
+                                   $this->notReconciled[] = $record;
+
+                                   $this->flaggedTotal += $recordAmount;
+                                   $this->flaggedTransactions[] = [
+                                       'bank_ref' => $lookupRef,
+                                       'amount' => $recordAmount,
+                                       'bank_date' => $record[0],
+                                       'route' => '-',
+                                       'comments' => "One match, amount mismatch",
+                                   ];
+                               } else {
+                                   $dt = $amountDts->first();
+                                   $dt->bank_ref = $record[2];
+                                   $dt->bank_date = $record[1];
+
+                                   $this->reconciledTotal += $dt->amount;
+                                   $this->reconciledTransactions[] = $dt;
+
+                                   // Mark reconciled
+                                   WaDebtorTran::find($dt->id)->update(['reconciled' => true]);
+                               }
+                            }
+                        } else {
+                            $dt = $dts->first();
+                            if ((float)$dt->amount == $recordAmount) {
+                                $dt->bank_ref = $record[2];
+                                $dt->bank_date = $record[1];
+
+                                $this->reconciledTotal += $dt->amount;
+                                $this->reconciledTransactions[] = $dt;
+
+                                // Mark reconciled
+                                WaDebtorTran::find($dt->id)->update(['reconciled' => true]);
+                            } else {
+                                $record[] = 'One match, amount mismatch';
+                                $this->notReconciled[] = $record;
+
+                                $this->flaggedTotal += $recordAmount;
+                                $this->flaggedTransactions[] = [
+                                    'bank_ref' => $lookupRef,
+                                    'amount' => $recordAmount,
+                                    'bank_date' => $record[0],
+                                    'route' => '-',
+                                    'comments' => "One match, amount mismatch",
+                                ];
+                            }
+                        }
+                    } else {
+                        $record[] = 'Missing In System';
+                        $this->notReconciled[] = $record;
+
+                        $this->missingTotal += $recordAmount;
+
+                        $waCustomerRecord = null;
+                        $this->missingTransactions[] = [
+                            'bank_ref' => $refColumn,
+                            'amount' => $recordAmount,
+                            'bank_date' => $record[1],
+                            'route' => $waCustomerRecord?->customer_name ?? '-',
+                            'comments' => "Missing In System",
+                        ];
+                    }
+                }
+            }
+        }
+    }
+
+    private function processKcbPayments($data, $debtorTrans): void
+    {
+        $waCustomers = DB::table('wa_customers')->select('kcb_till')->get();
+        foreach ($data as $index => $record) {
+            if ($index != 0) {
+                $recordAmount = (float)(str_replace(',', '', $record[4]));
+                $this->bankTotal += $recordAmount;
+                $this->bankCount += 1;
+
+                $refColumn = $record[1];
+                $refColumnContent = explode(' ', $refColumn);
+                $lookupRef = $refColumnContent[3] ?? null;
+                $lookupTill = $refColumnContent[9] ?? null;
+
+                if ($lookupRef == null) {
+                    $this->ignoredTotal += $recordAmount;
+                    $this->ignoredTransactions[] = [
+                        'bank_ref' => $refColumn,
+                        'amount' => $recordAmount,
+                        'bank_date' => $record[0],
+                        'route' => '-',
+                        'comments' => "Unknown Lookup Code/Missing Ref",
+                    ];
+                } else {
+                    $dts = $debtorTrans->filter(function ($_dt) use ($lookupRef) {
+                        return str_contains($_dt->reference, $lookupRef);
+                    });
+
+                    if (count($dts) > 0) {
+                        if (count($dts) > 1) {
+                            $this->flaggedTotal += $recordAmount;
+                            $this->flaggedTransactions[] = [
+                                'bank_ref' => $lookupRef,
+                                'amount' => $recordAmount,
+                                'bank_date' => $record[0],
+                                'route' => '-',
+                                'comments' => "Double entries",
+                            ];
+                        } else {
+                            $dt = $dts->first();
+                            if ((float)$dt->amount == $recordAmount) {
+                                $dt->bank_ref = $lookupRef;
+                                $dt->bank_date = $record[0];
+
+                                $this->reconciledTotal += $dt->amount;
+                                $this->reconciledTransactions[] = $dt;
+
+                                // Mark reconciled
+                                WaDebtorTran::find($dt->id)->update(['reconciled' => true]);
+                            } else {
+                                $this->flaggedTotal += $recordAmount;
+                                $this->flaggedTransactions[] = [
+                                    'bank_ref' => $lookupRef,
+                                    'amount' => $recordAmount,
+                                    'bank_date' => $record[0],
+                                    'route' => '-',
+                                    'comments' => "Amount Mismatch",
+                                ];
+                            }
+                        }
+                    } else {
+                        $this->missingTotal += $recordAmount;
+
+                        $waCustomerRecord = null;
+                        if ($lookupTill) {
+                            $waCustomerRecord = $waCustomers->filter(function ($_waCustomer) use ($lookupTill, $record) {
+                                return str_contains($_waCustomer->kcb_till, $lookupTill) || str_contains($lookupTill, $_waCustomer->kcb_till);
+                            })->first();
+                        }
+
+                        $this->missingTransactions[] = [
+                            'bank_ref' => $lookupRef,
+                            'amount' => $recordAmount,
+                            'bank_date' => $record[0],
+                            'route' => $waCustomerRecord?->customer_name ?? '-',
+                            'comments' => "Missing In Statement",
+                        ];
+                    }
+                }
+            }
+        }
+    }
+
+    public function unreconciled(Request $request)
+    {
+        $records = json_decode($request->records, true);
+        $headings = ['Transaction Date', 'Value Date', 'Narrative', 'Transaction Reference', 'Debit', 'Credit', 'Customer Reference', 'Running Balance', 'Cheque Number', 'Remarks1', 'Remarks2'];
+        return ExcelDownloadService::download('unreconciled', collect($records), $headings);
+    }
+
+    public function reconciled(Request $request)
+    {
+        $records = DB::table('wa_debtor_trans')
+            ->where('reconciled', true)
+            ->select(
+                'wa_debtor_trans.trans_date',
+                'wa_debtor_trans.input_date',
+                'wa_customers.customer_name',
+                'wa_debtor_trans.reference',
+                'wa_debtor_trans.document_no',
+                'wa_debtor_trans.amount',
+            )
+            ->join('wa_customers', 'wa_debtor_trans.wa_customer_id', '=', 'wa_customers.id')
+            ->get()->map(function ($record) {
+                $record->amount = abs($record->amount);
+                return $record;
+            });
+
+        return ExcelDownloadService::download('reconciled', $records, ['TRANS DATE', 'INPUT DATE', 'ROUTE', 'REFERENCE', 'DOC NO', 'AMOUNT']);
+    }
+
+    public function doubles(Request $request)
+    {
+        $records = json_decode($request->records, true);
+        return ExcelDownloadService::download('doubles', collect($records), ['DT_ID', 'TRANS DATE', 'INPUT DATE', 'REFERENCE', 'AMOUNT', 'DOC NO', 'ROUTE', 'BANK REF']);
+    }
+}

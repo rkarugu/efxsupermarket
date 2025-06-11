@@ -1,0 +1,92 @@
+@charset "utf-8";
+@charset "utf-8";
+@import url(http://weloveiconfonts.com/api/?family=fontawesome);
+
+[class*="fontawesome-"]:before {
+  font-family: 'FontAwesome', sans-serif;
+}
+/* CSS Document */
+.main-doc{background-color:#f6f6f6;    padding: 50px 0px 50px;}
+.logout_img{    margin: 0 auto;width:30%;float: right;}
+table{    background: #000000; color:#fff;}
+.inner-table{text-align:center;         padding: 19px 10px 44px;background-color:#ed1b24; color:#fff;}
+.inner-table h2, .inner-table p{margin:0px; font-size:22px;}
+.table tr td p {position:relative;}
+ 	.table tr td p label:before{width:19px; height:18px; border:1px solid #ddd; border-radius:4px; position:absolute;top:4px;right:0px; content:'';}
+	.table tr td p label:after{content:'\f00c'; color:green; font-family:fontawesome;position:absolute; top: 3px;right:0px; visibility:hidden;}
+	 	.table tr td p input{position:relative; z-index:11; opacity:0;    right: 0px;top: 0px;}
+			.table tr td p span{    margin-left: 6px; margin-top: -2px;display: inline-block;position: relative;}
+		.table tr td p  input:checked + label:after{ color:green; visibility:visible;    right: 2px;}
+			.table tr td, .table tr th{  border: 1px solid #1b1b1b!important; font-weight:normal;}
+			.table tr td{height: 117px;}
+
+#login {
+  margin: 20% auto;
+  width: 50%;
+}
+#login form {
+  margin: auto;
+  padding: 22px 22px 22px 22px;
+  width: 100%;
+  border-radius: 5px;
+  background: #282e33;
+  border-top: 3px solid #434a52;
+  border-bottom: 3px solid #434a52;
+}
+
+#login form span {
+  background-color: #363b41;
+  border-radius: 3px 0px 0px 3px;
+  border-right: 3px solid #434a52;
+  color: #606468;
+  display: block;
+  float: left;
+  line-height: 50px;
+  text-align: center;
+  width: 50px;
+  height: 50px;
+}
+#login form input[type="text"] {
+  background-color: #3b4148;
+  border-radius: 0px 3px 3px 0px;
+  color: #a9a9a9;
+  margin-bottom: 1em;
+  padding: 0 16px;
+  width: 90%;
+  height: 50px;
+}
+
+#login form input[type="password"] {
+  background-color: #3b4148;
+  border-radius: 0px 3px 3px 0px;
+  color: #a9a9a9;
+  margin-bottom: 1em;
+  padding: 0 16px;
+  width: 90%;
+  height: 50px;
+}
+
+#login form input[type="submit"] {
+  background: #ed1b24;
+  border: 0;
+  width: 30%;
+  height: 40px;
+  border-radius: 3px;
+  color: white;
+  cursor: pointer;
+  transition: background 0.3s ease-in-out;
+}
+#login form input[type="submit"]:hover {
+  background: #ed1b24;
+ 
+}
+
+#login form .input-group {
+  
+  width: 100%;
+}
+
+#login .help-block{
+	color:#ed1b24;
+}
+after { clear: both; }
