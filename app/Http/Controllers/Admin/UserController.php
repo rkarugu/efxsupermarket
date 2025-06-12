@@ -12,7 +12,6 @@ use App\Model\WaInternalRequisition;
 use App\Model\WaMergedPayments;
 use App\Model\Restaurant;
 use App\Model\WaRouteCustomer;
-use App\Services\InfoSkySmsService;
 use App\Model\WaShift;
 use App\Pesaflow;
 use Illuminate\Http\JsonResponse;
@@ -42,7 +41,6 @@ use App\Model\BankEquityTransaction;
 use App\Model\WalletTransaction;
 use App\Interfaces\SmsService;
 
-
 use App\Model\OrderBookedTable;
 use App\Model\WaCustomer;
 use App\SalesmanShift;
@@ -62,7 +60,6 @@ use Spatie\Activitylog\Models\Activity;
 
 class UserController extends Controller
 {
-
 
     public function equity_callback(Request $request)
     {
@@ -792,24 +789,40 @@ class UserController extends Controller
 
 
                 if ($request->file('image_update')) {
-                    $uploadPath = 'uploads/users';
-                    $thumbUploadPath = 'uploads/users/thumb';
+                    // Define correct absolute paths using base_path(), which points to public_html
+                    $main_dir = base_path('uploads/users');
+                    $thumb_dir = base_path('uploads/users/thumb');
 
-                    if (!file_exists($uploadPath)) {
-                        \Illuminate\Support\Facades\File::makeDirectory($uploadPath, $mode = 0777, true, true);
+                    // Create directories if they don't exist
+                    if (!\Illuminate\Support\Facades\File::isDirectory($main_dir)) {
+                        \Illuminate\Support\Facades\File::makeDirectory($main_dir, 0775, true, true);
                     }
-
-                    if (!file_exists($thumbUploadPath)) {
-                        \Illuminate\Support\Facades\File::makeDirectory($thumbUploadPath, $mode = 0777, true, true);
+                    if (!\Illuminate\Support\Facades\File::isDirectory($thumb_dir)) {
+                        \Illuminate\Support\Facades\File::makeDirectory($thumb_dir, 0775, true, true);
                     }
 
                     $file = $request->file('image_update');
-                    $image = uploadwithresize($file, 'users', '341');
+                    $image_name = time() . rand(111111111, 999999999) . '.' . $file->getClientOriginalExtension();
 
+                    // Create and save a resized thumbnail
+                    $thumb_image = \Intervention\Image\Facades\Image::make($file->getRealPath())->resize(341, null, function ($constraint) {
+                        $constraint->aspectRatio();
+                    });
+
+                    // Move the original file and save the thumbnail
+                    $file->move($main_dir, $image_name);
+                    $thumb_image->save($thumb_dir . '/' . $image_name);
+
+                    // Delete old image if it exists, using the correct absolute paths
                     if ($previous_row->image) {
-                        unlinkfile('users', $previous_row->image);
+                        if (\Illuminate\Support\Facades\File::exists($main_dir . '/' . $previous_row->image)) {
+                            \Illuminate\Support\Facades\File::delete($main_dir . '/' . $previous_row->image);
+                        }
+                        if (\Illuminate\Support\Facades\File::exists($thumb_dir . '/' . $previous_row->image)) {
+                            \Illuminate\Support\Facades\File::delete($thumb_dir . '/' . $previous_row->image);
+                        }
                     }
-                    $row->image = $image;
+                    $row->image = $image_name;
                 }
                 $row->save();
                 Session::flash('success', 'Record updated successfully.');
@@ -822,6 +835,7 @@ class UserController extends Controller
             return redirect()->back()->withInput();
         }
     }
+
 
     public function create()
     {
@@ -1119,9 +1133,31 @@ class UserController extends Controller
             $row->drop_limit = $request->drop_limit?? 50000;
 
             if ($request->file('image')) {
+                // Define correct absolute paths using base_path(), which points to public_html
+                $main_dir = base_path('uploads/users');
+                $thumb_dir = base_path('uploads/users/thumb');
+
+                // Create directories if they don't exist
+                if (!\Illuminate\Support\Facades\File::isDirectory($main_dir)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($main_dir, 0775, true, true);
+                }
+                if (!\Illuminate\Support\Facades\File::isDirectory($thumb_dir)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($thumb_dir, 0775, true, true);
+                }
+
                 $file = $request->file('image');
-                $image = uploadwithresize($file, 'users', '341');
-                $row->image = $image;
+                $image_name = time() . rand(111111111, 999999999) . '.' . $file->getClientOriginalExtension();
+
+                // Create and save a resized thumbnail
+                $thumb_image = \Intervention\Image\Facades\Image::make($file->getRealPath())->resize(341, null, function ($constraint) {
+                    $constraint->aspectRatio();
+                });
+
+                // Move the original file and save the thumbnail
+                $file->move($main_dir, $image_name);
+                $thumb_image->save($thumb_dir . '/' . $image_name);
+
+                $row->image = $image_name;
             }
             if ($request->file('e_sign_image')) {
                 $file = $request->file('e_sign_image');
@@ -1282,13 +1318,40 @@ class UserController extends Controller
 
                 //   $row->max_discount_percent=$request->max_discount_percent;
                 if ($request->file('image_update')) {
-                    $file = $request->file('image_update');
-                    $image = uploadwithresize($file, 'users', '341');
+                    // Define correct absolute paths using base_path(), which points to public_html
+                    $main_dir = base_path('uploads/users');
+                    $thumb_dir = base_path('uploads/users/thumb');
 
-                    if ($previous_row->image) {
-                        unlinkfile('users', $previous_row->image);
+                    // Create directories if they don't exist
+                    if (!\Illuminate\Support\Facades\File::isDirectory($main_dir)) {
+                        \Illuminate\Support\Facades\File::makeDirectory($main_dir, 0775, true, true);
                     }
-                    $row->image = $image;
+                    if (!\Illuminate\Support\Facades\File::isDirectory($thumb_dir)) {
+                        \Illuminate\Support\Facades\File::makeDirectory($thumb_dir, 0775, true, true);
+                    }
+
+                    $file = $request->file('image_update');
+                    $image_name = time() . rand(111111111, 999999999) . '.' . $file->getClientOriginalExtension();
+
+                    // Create and save a resized thumbnail
+                    $thumb_image = \Intervention\Image\Facades\Image::make($file->getRealPath())->resize(341, null, function ($constraint) {
+                        $constraint->aspectRatio();
+                    });
+
+                    // Move the original file and save the thumbnail
+                    $file->move($main_dir, $image_name);
+                    $thumb_image->save($thumb_dir . '/' . $image_name);
+
+                    // Delete old image if it exists, using the correct absolute paths
+                    if ($previous_row->image) {
+                        if (\Illuminate\Support\Facades\File::exists($main_dir . '/' . $previous_row->image)) {
+                            \Illuminate\Support\Facades\File::delete($main_dir . '/' . $previous_row->image);
+                        }
+                        if (\Illuminate\Support\Facades\File::exists($thumb_dir . '/' . $previous_row->image)) {
+                            \Illuminate\Support\Facades\File::delete($thumb_dir . '/' . $previous_row->image);
+                        }
+                    }
+                    $row->image = $image_name;
                 }
                 if ($request->file('e_sign_image')) {
                     $file = $request->file('e_sign_image');
@@ -1644,6 +1707,8 @@ class UserController extends Controller
         $merchantTransId = $rawInput['Body']['stkCallback']['MerchantRequestID'];
 
         if ($ResultCode == 0) {
+
+            //$this->save_txt( $response_xml, 'EasyFI_response_json_success'.date('YmdHis') );
 
             foreach ($rawInput['Body']['stkCallback']['CallbackMetadata']['Item'] as $key => $value) {
 
