@@ -61,3 +61,5 @@ app.component('other-deductions-report', OtherDeductionsReport);
 app.component('device-center', DeviceCenter);
 
 app.mount("#admin-app");
+
+// Force rebuild: 2025-06-12T13:23:00+03:00
