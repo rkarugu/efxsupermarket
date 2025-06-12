@@ -7,6 +7,5 @@
 .idea/
 .vscode/
 /public/hot
-/public/build
 node_modules/
 storage/logs/laravel.log

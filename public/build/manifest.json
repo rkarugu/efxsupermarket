@@ -1,0 +1,14 @@
+{
+  "resources/js/admin-app.css": {
+    "file": "assets/admin-app-4827fc9b.css",
+    "src": "resources/js/admin-app.css"
+  },
+  "resources/js/admin-app.js": {
+    "css": [
+      "assets/admin-app-4827fc9b.css"
+    ],
+    "file": "assets/admin-app-faa8e6bf.js",
+    "isEntry": true,
+    "src": "resources/js/admin-app.js"
+  }
+}
