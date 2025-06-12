@@ -11,8 +11,8 @@
 @endsection
 
 @section('uniquepagescript')
-    <link rel="stylesheet" href="{{ asset('build/assets/admin-app-4827fc9b.css') }}">
-    <script type="module" src="{{ asset('build/assets/admin-app-f55bbd21.js') }}"></script>
+    <link rel="stylesheet" href="/build/assets/admin-app-4827fc9b.css">
+    <script type="module" src="/build/assets/admin-app-f55bbd21.js"></script>
 @endsection
 
 @push('styles')
