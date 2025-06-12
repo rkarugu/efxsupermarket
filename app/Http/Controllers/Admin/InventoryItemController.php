@@ -26,7 +26,8 @@ use App\Model\WaStockMove2;
 use App\Model\WaNumerSeriesCode;
 use App\Model\WaGlTran;
 use App\Model\WaCategory;
-use App\Model\WaSupplier;
+use App\Models\WaSupplier;
+use Illuminate\Support\Facades\File;
 use App\Model\WaCategoryItemPrice;
 use App\Model\PackSize;
 use App\Model\WaInventoryAssignedItems;
@@ -763,14 +764,20 @@ class InventoryItemController extends Controller
             }
             $data = $request->all();
 
-            try {
-                $imagePath = $request->file('image')->store('images');
+            if ($request->hasFile('image')) {
+                $uploadPath = 'uploads/inventory_items';
+                if (!file_exists(public_path($uploadPath))) {
+                    File::makeDirectory(public_path($uploadPath), 0755, true, true);
+                }
+                $file = $request->file('image');
+                $fileName = time() . rand(0000000000, 9999999999) . '.' . $file->getClientOriginalExtension();
+                $file->move(public_path($uploadPath), $fileName);
+                $imagePath = $uploadPath . '/' . $fileName;
+
                 $data['image'] = [
-                    'original_name' => $request->file('image')->getClientOriginalName(),
+                    'original_name' => $file->getClientOriginalName(),
                     'path' => $imagePath
                 ];
-            } catch (\Throwable $e) {
-                // pass
             }
 
             $jsonData = json_encode($data);
@@ -1071,6 +1078,13 @@ class InventoryItemController extends Controller
                 $row->item_sub_category_id = $request->item_sub_category_id;
                 $row->item_sub_category_id = $request->item_sub_category_id;
                 $row->approval_status = 'Approved';
+
+                $newApprovalStatus = WaInventoryItemApprovalStatus::find($id);
+                $newData = json_decode($newApprovalStatus->new_data);
+                if (isset($newData->image) && isset($newData->image->path)) {
+                    $row->image = $newData->image->path;
+                }
+
                 $row->save();
 
                 if ($request->suppliers) {
@@ -1082,7 +1096,6 @@ class InventoryItemController extends Controller
                     }
                 }
 
-                $newApprovalStatus = WaInventoryItemApprovalStatus::find($id);
                 $newApprovalStatus->status = 'Approved';
                 $newApprovalStatus->wa_inventory_items_id = $row->id;
                 $newApprovalStatus->save();
