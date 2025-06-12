@@ -19,33 +19,18 @@ use App\Observers\StockMoveObserver;
 class AppServiceProvider extends ServiceProvider
 {
     /**
-     * Bootstrap any application services.
-     *
-     * @return void
-     */
-    public function boot()
-    {
-        Paginator::useBootstrapFour();
-
-        if (config('app.env') === 'production') {
-            URL::forceScheme('https');
-        }
-
-        Activity::saving(function (Activity $activity) {
-            $activity->properties = $activity->properties->put('ip', request()->ip());
-            $activity->properties = $activity->properties->put('user_agent', request()->header('User-Agent'));
-        });
-
-        WaStockMove::observe(StockMoveObserver::class);
-    }
-
-    /**
      * Register any application services.
      *
      * @return void
      */
-    public function register()
+    public function register(): void
     {
+        if ($this->app->environment('production')) {
+            $this->app->bind('path.public', function () {
+                return realpath(base_path());
+            });
+        }
+
         $mpesaPaymentsProvider = config('app.mpesa_payments_provider');
         switch ($mpesaPaymentsProvider) {
             case 'daraja':
@@ -67,5 +52,26 @@ class AppServiceProvider extends ServiceProvider
                 $this->app->singleton(SmsService::class, AirTouchSmsService::class);
                 break;
         }
+    }
+
+    /**
+     * Bootstrap any application services.
+     *
+     * @return void
+     */
+    public function boot(): void
+    {
+        Paginator::useBootstrapFour();
+
+        if (config('app.env') === 'production' || config('app.env') === 'staging') {
+            URL::forceScheme('https');
+        }
+
+        Activity::saving(function (Activity $activity) {
+            $activity->properties = $activity->properties->put('ip', request()->ip());
+            $activity->properties = $activity->properties->put('user_agent', request()->header('User-Agent'));
+        });
+
+        WaStockMove::observe(StockMoveObserver::class);
     }
 }
