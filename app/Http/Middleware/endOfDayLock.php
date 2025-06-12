@@ -30,9 +30,9 @@ class endOfDayLock
             return $next($request);
         }
 
-    //    if (!$record) {
-    //        return redirect()->route('admin.dashboard')->with('warning', 'End of Day For Branch closing was not done Yesteryear. ');
-    //    }
-     //   return $next($request);
+       if (!$record) {
+           return redirect()->route('admin.dashboard')->with('warning', 'End of Day For Branch closing was not done Yesteryear. ');
+       }
+       return $next($request);
     }
 }
