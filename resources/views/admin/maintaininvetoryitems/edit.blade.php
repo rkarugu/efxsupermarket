@@ -411,7 +411,7 @@
                             <br>
                             @if ($row->image)
                                 <img width="100px"
-                                    height="100px;"src="{{ asset('uploads/inventory_items/' . $row->image) }}">
+                                    height="100px;"src="{{ asset_public('uploads/inventory_items/' . $row->image) }}">
                             @endif
                         </div>
                     </div>
