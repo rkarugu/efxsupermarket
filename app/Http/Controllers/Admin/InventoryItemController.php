@@ -846,7 +846,7 @@ class InventoryItemController extends Controller
             $file = $request->file('image');
             $fileName = time() . rand(111111111, 9999999999) . '.' . $file->getClientOriginalExtension();
             $file->move(public_path('uploads/inventory_items/'), $fileName);
-            DB::table('wa_inventory_items')->where('id', $row->id)->update(['image' => $fileName]);
+            $row->image = $fileName;
         }
         $row->wa_inventory_category_id = $request->wa_inventory_category_id;
         $row->item_sub_category_id = $request->item_sub_category_id;
