@@ -762,7 +762,7 @@ class InventoryItemController extends Controller
             $data = $request->all();
 
             if ($request->hasFile('image')) {
-                $uploadPath = base_path('../public_html/public_html/uploads/inventory_items');
+                $uploadPath = base_path('../public_html/uploads/inventory_items');
                 if (!file_exists($uploadPath)) {
                     \Illuminate\Support\Facades\File::makeDirectory($uploadPath, 0755, true, true);
                 }
@@ -810,9 +810,9 @@ class InventoryItemController extends Controller
         try {
             foreach (DB::table('wa_inventory_items')->get() as $record) {
                 $item = WaInventoryItem::find($record->id);
-                if (\Illuminate\Support\Facades\File::exists(public_path("public_html/public_html/uploads/inventory_items/{$item->stock_id_code}.jpg"))) {
+                if (\Illuminate\Support\Facades\File::exists(base_path("../public_html/uploads/inventory_items/{$item->stock_id_code}.jpg"))) {
                     $item->image = "$item->stock_id_code.jpg";
-                } else if (\Illuminate\Support\Facades\File::exists(public_path("public_html/public_html/uploads/inventory_items/{$item->stock_id_code}.JPG"))) {
+                } else if (\Illuminate\Support\Facades\File::exists(base_path("../public_html/uploads/inventory_items/{$item->stock_id_code}.JPG"))) {
                     $item->image = "$item->stock_id_code.JPG";
                 } else {
                     $item->image = null;

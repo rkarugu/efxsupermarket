@@ -49,12 +49,13 @@
             "database"
         ],
         "psr-4": {
-            "App\\": "app/"
-        }
-         ,
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        },
         "files": [
-        "app/helpers.php",
-        "app/Helpers/smsHelper.php"
+            "app/Helpers/helpers.php",
+            "app/Helpers/smsHelper.php"
         ]
     },
     "autoload-dev": {
