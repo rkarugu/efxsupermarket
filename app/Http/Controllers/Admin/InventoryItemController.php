@@ -396,7 +396,7 @@ class InventoryItemController extends Controller
                 $nestedData['item_category'] = $row->category_description;
                 $nestedData['title'] = $row->title;
                 if ($row->image) {
-                    $imageUrl = asset_public('uploads/inventory_items/' . $row->image);
+                    $imageUrl = asset('public/uploads/inventory_items/' . $row->image);
                     $nestedData['image'] = '<img src="' . $imageUrl . '" width="50" alt="Item Image"/>';
                 } else {
                     $nestedData['image'] = '';
