@@ -842,11 +842,18 @@ class InventoryItemController extends Controller
         $row->stock_id_code = strtoupper($request->stock_id_code);
         $row->title = $request->title;
         $row->description = $request->description;
+        $oldImage = $row->image;
         if ($request->file('image')) {
             $file = $request->file('image');
             $fileName = time() . rand(111111111, 9999999999) . '.' . $file->getClientOriginalExtension();
             $file->move(public_path('uploads/inventory_items/'), $fileName);
             $row->image = $fileName;
+            if ($approvalStatus != ApprovalStatus::PendingNewApproval->value) {
+                $changes['image'] = [
+                    'old' => $oldImage,
+                    'new' => $fileName,
+                ];
+            }
         }
         $row->wa_inventory_category_id = $request->wa_inventory_category_id;
         $row->item_sub_category_id = $request->item_sub_category_id;
