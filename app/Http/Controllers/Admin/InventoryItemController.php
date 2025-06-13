@@ -26,7 +26,7 @@ use App\Model\WaStockMove2;
 use App\Model\WaNumerSeriesCode;
 use App\Model\WaGlTran;
 use App\Model\WaCategory;
-use App\Models\WaSupplier;
+use App\Model\WaSupplier;
 use Illuminate\Support\Facades\File;
 use App\Model\WaCategoryItemPrice;
 use App\Model\PackSize;
