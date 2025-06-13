@@ -38,12 +38,9 @@ use App\Models\WaInventoryItemApprovalStatus;
 use App\Services\ExcelDownloadService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\{DB, Session, Validator};
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\Validator;
 use Yajra\DataTables\Facades\DataTables;
 use App\Interfaces\Inventory\ApprovalItemInterface;
 use App\Model\User;
@@ -767,7 +764,7 @@ class InventoryItemController extends Controller
             if ($request->hasFile('image')) {
                 $uploadPath = 'uploads/inventory_items';
                 if (!file_exists(public_path($uploadPath))) {
-                    File::makeDirectory(public_path($uploadPath), 0755, true, true);
+                    \Illuminate\Support\Facades\File::makeDirectory(public_path($uploadPath), 0755, true, true);
                 }
                 $file = $request->file('image');
                 $fileName = time() . rand(0000000000, 9999999999) . '.' . $file->getClientOriginalExtension();
@@ -814,9 +811,9 @@ class InventoryItemController extends Controller
         try {
             foreach (DB::table('wa_inventory_items')->get() as $record) {
                 $item = WaInventoryItem::find($record->id);
-                if (File::exists(public_path("uploads/inventory_items/{$item->stock_id_code}.jpg"))) {
+                if (\Illuminate\Support\Facades\File::exists(public_path("uploads/inventory_items/{$item->stock_id_code}.jpg"))) {
                     $item->image = "$item->stock_id_code.jpg";
-                } else if (File::exists(public_path("uploads/inventory_items/{$item->stock_id_code}.JPG"))) {
+                } else if (\Illuminate\Support\Facades\File::exists(public_path("uploads/inventory_items/{$item->stock_id_code}.JPG"))) {
                     $item->image = "$item->stock_id_code.JPG";
                 } else {
                     $item->image = null;
