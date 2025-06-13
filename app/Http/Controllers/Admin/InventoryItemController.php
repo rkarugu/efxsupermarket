@@ -773,7 +773,7 @@ class InventoryItemController extends Controller
 
                 $data['image'] = [
                     'original_name' => $file->getClientOriginalName(),
-                    'path' => $imagePath
+                    'path' => $fileName
                 ];
             }
 
