@@ -761,19 +761,15 @@ class InventoryItemController extends Controller
             }
             $data = $request->all();
 
-            if ($request->hasFile('image')) {
+            if ($request->file('image')) {
+                $file = $request->file('image');
+                $fileName = time() . rand(111111111, 9999999999) . '.' . $file->getClientOriginalExtension();
                 $uploadPath = base_path('../public_html/uploads/inventory_items');
                 if (!file_exists($uploadPath)) {
-                    \Illuminate\Support\Facades\File::makeDirectory($uploadPath, 0755, true, true);
+                    \Illuminate\Support\Facades\File::makeDirectory($uploadPath, 0777, true, true);
                 }
-                $file = $request->file('image');
-                $fileName = time() . rand(0000000000, 9999999999) . '.' . $file->getClientOriginalExtension();
                 $file->move($uploadPath, $fileName);
-
-                $data['image'] = [
-                    'original_name' => $file->getClientOriginalName(),
-                    'path' => $fileName
-                ];
+                $row->image = $fileName;
             }
 
             $jsonData = json_encode($data);
