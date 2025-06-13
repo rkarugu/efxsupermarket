@@ -395,6 +395,12 @@ class InventoryItemController extends Controller
                 $nestedData['stock_id_code'] = $row->stock_id_code;
                 $nestedData['item_category'] = $row->category_description;
                 $nestedData['title'] = $row->title;
+                if ($row->image) {
+                    $imageUrl = asset_public('uploads/inventory_items/' . $row->image);
+                    $nestedData['image'] = '<img src="' . $imageUrl . '" width="50" alt="Item Image"/>';
+                } else {
+                    $nestedData['image'] = '';
+                }
                 $nestedData['uom'] = @$row->pack_size->title;
                 // $nestedData['vortex_cost'] = manageAmountFormat($row->vortex_cost);
                 $nestedData['standard_cost'] = manageAmountFormat($row->standard_cost);

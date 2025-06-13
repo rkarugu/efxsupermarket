@@ -365,12 +365,4 @@ class WaInventoryItem extends BaseModel
     {
         return $this->hasOne(CompetingBrandItem::class, 'wa_inventory_item_id');
     }
-
-    public function getImageAttribute($value)
-    {
-        if ($value) {
-            return asset_public('uploads/inventory_items/' . $value);
-        }
-        return null;
-    }
 }

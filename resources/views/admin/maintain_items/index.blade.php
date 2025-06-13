@@ -76,6 +76,7 @@
                 <table class="table table-bordered table-hover" id="inventoryItemsDataTable">
                     <thead>
                         <tr>
+                            <th>Image</th>
                             <th>Stock ID Code</th>
                             <th>Title</th>
                             <th>Item Category</th>
@@ -196,6 +197,11 @@
                     }
                 },
                 columns: [{
+                        data: 'image',
+                        name: 'image',
+                        orderable: false,
+                        searchable: false
+                    }, {
                         data: 'stock_id_code',
                         name: 'stock_id_code',
                     },
