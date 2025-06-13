@@ -342,7 +342,7 @@ class PosCashSalesController extends Controller
         $data = [
             'id' => $item->id,
             'stock_id_code' => $item->stock_id_code,
-            'image_url' => $item->image ? asset('uploads/inventory_items/' . $item->image) : asset('assets/images/users/0.jpg'),
+            'image_url' => $item->image ? asset_public('uploads/inventory_items/' . $item->image) : asset('assets/images/users/0.jpg'),
             'description' => $item->description,
             'quantity_in_stock' => $item->quantity ?? 0,
             'unit' => $item->pack_size->title ?? null,
