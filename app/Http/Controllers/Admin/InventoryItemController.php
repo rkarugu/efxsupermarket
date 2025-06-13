@@ -204,6 +204,13 @@ class InventoryItemController extends Controller
 
         if (request()->wantsJson()) {
             return DataTables::eloquent($query)
+                ->addColumn('image', function ($item) {
+                    if ($item->image) {
+                        return '<img src="' . asset_public('uploads/inventory_items/' . $item->image) . '" width="50" alt="Item Image"/>';
+                    }
+
+                    return '';
+                })
                 ->editColumn('standard_cost', function ($item) {
                     return manageAmountFormat($item->standard_cost);
                 })
@@ -238,7 +245,8 @@ class InventoryItemController extends Controller
                 ->addColumn('actions', function ($item) {
                     return view('admin.maintain_items.actions', compact('item'));
                 })
-                ->toJson();
+                ->rawColumns(['image', 'qty_on_hand', 'qty_on_order', 'actions'])
+                ->make(true);
         }
 
         $breadcum = [
@@ -396,7 +404,7 @@ class InventoryItemController extends Controller
                 $nestedData['item_category'] = $row->category_description;
                 $nestedData['title'] = $row->title;
                 if ($row->image) {
-                    $imageUrl = asset('public/uploads/inventory_items/' . $row->image);
+                    $imageUrl = 'https://efficentrix.co.ke/public/uploads/inventory_items/' . $row->image;
                     $nestedData['image'] = '<img src="' . $imageUrl . '" width="50" alt="Item Image"/>';
                 } else {
                     $nestedData['image'] = '';
