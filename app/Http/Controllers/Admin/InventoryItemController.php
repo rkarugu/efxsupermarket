@@ -762,14 +762,13 @@ class InventoryItemController extends Controller
             $data = $request->all();
 
             if ($request->hasFile('image')) {
-                $uploadPath = 'uploads/inventory_items';
-                if (!file_exists(public_path($uploadPath))) {
-                    \Illuminate\Support\Facades\File::makeDirectory(public_path($uploadPath), 0755, true, true);
+                $uploadPath = base_path('../public_html/uploads/inventory_items');
+                if (!file_exists($uploadPath)) {
+                    \Illuminate\Support\Facades\File::makeDirectory($uploadPath, 0755, true, true);
                 }
                 $file = $request->file('image');
                 $fileName = time() . rand(0000000000, 9999999999) . '.' . $file->getClientOriginalExtension();
-                $file->move(public_path($uploadPath), $fileName);
-                $imagePath = $uploadPath . '/' . $fileName;
+                $file->move($uploadPath, $fileName);
 
                 $data['image'] = [
                     'original_name' => $file->getClientOriginalName(),
@@ -845,7 +844,11 @@ class InventoryItemController extends Controller
         if ($request->file('image')) {
             $file = $request->file('image');
             $fileName = time() . rand(111111111, 9999999999) . '.' . $file->getClientOriginalExtension();
-            $file->move(public_path('uploads/inventory_items/'), $fileName);
+            $uploadPath = base_path('../public_html/uploads/inventory_items');
+            if (!file_exists($uploadPath)) {
+                \Illuminate\Support\Facades\File::makeDirectory($uploadPath, 0777, true, true);
+            }
+            $file->move($uploadPath, $fileName);
             $row->image = $fileName;
         }
         $row->wa_inventory_category_id = $request->wa_inventory_category_id;
