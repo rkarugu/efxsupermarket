@@ -551,6 +551,7 @@ return array(
     'App\\Http\\Controllers\\Admin\\PettyCashRequestController' => $baseDir . '/app/Http/Controllers/Admin/PettyCashRequestController.php',
     'App\\Http\\Controllers\\Admin\\PettyCashRequestTypeController' => $baseDir . '/app/Http/Controllers/Admin/PettyCashRequestTypeController.php',
     'App\\Http\\Controllers\\Admin\\PettyCashTypesController' => $baseDir . '/app/Http/Controllers/Admin/PettyCashTypesController.php',
+    'App\\Http\\Controllers\\Admin\\PosCashSaleController' => $baseDir . '/app/Http/Controllers/Admin/PosCashSaleController.php',
     'App\\Http\\Controllers\\Admin\\PosCashSalesController' => $baseDir . '/app/Http/Controllers/Admin/PosCashSalesController.php',
     'App\\Http\\Controllers\\Admin\\PosCashSalesTestController' => $baseDir . '/app/Http/Controllers/Admin/PosCashSalesTestController.php',
     'App\\Http\\Controllers\\Admin\\PosCashSales_newController' => $baseDir . '/app/Http/Controllers/Admin/PosCashSales_newController.php',
