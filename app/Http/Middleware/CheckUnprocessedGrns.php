@@ -41,6 +41,9 @@ class CheckUnprocessedGrns
 
         $days = Setting::where('name', 'MAXIMUM_UNPROCESSED_GRN_DAYS')->first()->description ?? 3;
 
+        // HOTFIX: Bypass unprocessed GRN check to prevent redirect loop
+        // Allow users to access system regardless of pending unprocessed GRNs
+        /*
         $pendingGRNs = WaGrn::query()
             ->where('created_at', '<', now()->subDays($days)->startOfDay()->format('Y-m-d H:i:s'))
             ->doesntHave('invoice')
@@ -53,5 +56,8 @@ class CheckUnprocessedGrns
         Session::flash('warning', "You have GRNs more than $days Days not processed");
 
         return redirect()->route('pending-grns.index');
+        */
+        
+        return $next($request);
     }
 }

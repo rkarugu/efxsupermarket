@@ -39,6 +39,9 @@ class CheckUnsentGrnDocuments
 
         $days = Setting::where('name', 'MAXIMUM_SEND_GRN_DOCUMENTS_DAYS')->first()->description ?? 3;
 
+        // HOTFIX: Bypass GRN document check to prevent redirect loop
+        // Allow users to access system regardless of pending GRN documents
+        /*
         $pendingGRNs = WaGrn::query()
             ->join('wa_purchase_orders as orders', 'orders.id', 'wa_grns.wa_purchase_order_id')
             ->where('documents_sent', 0)
@@ -55,5 +58,8 @@ class CheckUnsentGrnDocuments
         Session::flash('warning', "You have GRNs with documents more than $days Days not sent to payables ($grns)");
 
         return redirect()->route('completed-grn.index');
+        */
+        
+        return $next($request);
     }
 }
