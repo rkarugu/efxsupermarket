@@ -1,11 +1,17 @@
-/demo
-/storage/debugbar
-/public/storage
-# Temporarily allowing logs for debugging
-# /storage/*.key
+/vendor/
+/node_modules/
 .env
+.env.*
+/public/storage
+/storage/*.key
+/public/build
 .idea/
 .vscode/
+/bootstrap/cache/*
 /public/hot
-node_modules/
-storage/logs/laravel.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/coverage/
+.DS_Store
+Thumbs.db
