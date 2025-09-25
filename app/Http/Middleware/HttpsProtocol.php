@@ -15,11 +15,11 @@ class HttpsProtocol
      */
     public function handle($request, Closure $next)
     {
-        // Force HTTPS only in production to avoid local redirect loops
-        if (app()->environment('production') && !$request->isSecure()) {
-            return redirect()->secure($request->getRequestUri());
-        }
+        // if (!$request->secure() && App::environment() === 'production') {
+            
+        //     return redirect()->secure($request->getRequestUri());
+        // }
 
-        return $next($request);
+        return $next($request); 
     }
 }

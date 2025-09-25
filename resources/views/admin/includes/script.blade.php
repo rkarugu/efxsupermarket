@@ -22,6 +22,13 @@
 <script src="{{ asset('assets/admin/validation.js') }}"></script>
 
 <script>
+    // Setup CSRF token for all AJAX requests
+    $.ajaxSetup({
+        headers: {
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        }
+    });
+
     Number.prototype.formatMoney = function(c, d, t) {
         let n = this,
             cc = isNaN(c = Math.abs(c)) ? 2 : c,

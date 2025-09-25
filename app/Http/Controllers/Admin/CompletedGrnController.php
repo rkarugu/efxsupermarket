@@ -49,13 +49,7 @@ class CompletedGrnController extends Controller
                 'suppliers.name AS supplier_name',
                 'users.name AS received_by',
                 'locations.location_name',
-                DB::raw(
-                    'SUM('
-                    . 'CAST(JSON_UNQUOTE(JSON_EXTRACT(invoice_info, \'$.order_price\')) AS DECIMAL(15,4)) * '
-                    . 'CAST(JSON_UNQUOTE(JSON_EXTRACT(invoice_info, \'$.qty\')) AS DECIMAL(15,4)) - '
-                    . 'IFNULL(CAST(JSON_UNQUOTE(JSON_EXTRACT(invoice_info, \'$.total_discount\')) AS DECIMAL(15,4)), 0)'
-                    . ') AS total_amount'
-                ),
+                DB::raw('SUM(invoice_info->"$.order_price" * invoice_info->"$.qty" - IFNULL(invoice_info->"$.total_discount", 0)) AS total_amount'),
             ])
             ->withCount('returnsToPrint')
             ->with([

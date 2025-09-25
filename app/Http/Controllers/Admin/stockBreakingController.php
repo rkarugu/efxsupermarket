@@ -34,14 +34,15 @@ class stockBreakingController extends Controller
     public function index(Request $request)
     {
         $permission =  $this->mypermissionsforAModule();
-        $pmodule = $this->pmodule;
-        $title = $this->title;
-        $model = $this->model;
-        $user = getLoggeduserProfile();
+            $pmodule = $this->pmodule;
+            $title = $this->title;
+            $model = $this->model;
+            $user = getLoggeduserProfile();
 
-        if (isset($permission[$pmodule . '___view']) || $permission == 'superadmin') {
+            if (isset($permission[$pmodule . '___view']) || $permission == 'superadmin') {
             $breadcum = [$title => route($model . '.index'), 'Listing' => ''];
             if ($request->ajax()) {
+                try {
                 $sortable_columns = [
                     'wa_stock_breaking.id',
                     'users.name',
@@ -49,12 +50,18 @@ class stockBreakingController extends Controller
                     'wa_stock_breaking.user_id',
                     'wa_stock_breaking.user_id'
                 ];
-                $limit          = $request->input('length');
-                $start          = $request->input('start');
-                $search         = $request['search']['value'];
-                $orderby        = $request['order']['0']['column'] ?? 'id';
-                $order          = $request['order']['0']['dir'] ?? "DESC";
-                $draw           = $request['draw'];
+                // Safely read DataTables parameters with sensible defaults
+                $limit          = (int) $request->input('length', 10);
+                $start          = (int) $request->input('start', 0);
+                $search         = (string) $request->input('search.value', '');
+                $orderbyIndex   = (int) $request->input('order.0.column', 0);
+                $order          = strtoupper((string) $request->input('order.0.dir', 'DESC')) === 'ASC' ? 'ASC' : 'DESC';
+                $draw           = (int) $request->input('draw', 0);
+
+                // Validate orderBy index to avoid undefined offset
+                if (!isset($sortable_columns[$orderbyIndex])) {
+                    $orderbyIndex = 0; // default to first sortable column
+                }
                 $data = WaStockBreaking::select([
                     'wa_stock_breaking.*',
                     'users.name as user_name',
@@ -87,8 +94,10 @@ class stockBreakingController extends Controller
                 if ($user->role_id != 1) {
                     $data = $data->where('users.wa_location_and_store_id', $user->wa_location_and_store_id);
                 }
-                $data = $data->orderBy($sortable_columns[$orderby], $order);
-                $totalCms       = count($data->get());
+                // Compute total count BEFORE ordering/pagination to avoid SQL issues
+                $totalCms       = (clone $data)->count('wa_stock_breaking.id');
+                // Apply ordering after count
+                $data = $data->orderBy($sortable_columns[$orderbyIndex], $order);
                 $response       = $data->limit($limit)->offset($start)->get()->map(function ($item) use ($permission, $user) {
                     $item->user_name = @$item->user_name;
                     $item->date_time = $item->date . ' / ' . $item->time;
@@ -129,11 +138,29 @@ class stockBreakingController extends Controller
                     "data"              =>  $response
                 ];
 
-                return $return;
+                return response()->json($return);
+                } catch (\Throwable $e) {
+                    \Log::error('StockBreaking index AJAX error', [
+                        'message' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                    return response()->json([
+                        'message' => 'Server error loading stock breaking data',
+                        'error' => $e->getMessage(),
+                    ], 500);
+                }
             }
 
             return view('admin.stock_breaking.index', compact('user', 'title', 'model', 'breadcum', 'pmodule', 'permission'));
         } else {
+            // If this is an AJAX/DataTables request and the user lacks permission, return 403 JSON
+            if ($request->ajax()) {
+                return response()->json([
+                    'message' => 'You do not have permission to view Stock Breaking.'
+                ], 403);
+            }
             Session::flash('warning', 'Invalid Request');
             return redirect()->back();
         }

@@ -12,7 +12,7 @@ class VerifyCsrfToken extends BaseVerifier
      * @var array
      */
     protected $except = [
-        //
+        'admin/stock-breaking',
     ];
 
     protected $except_urls = [

@@ -2746,6 +2746,7 @@ Pending Bills Per Waiter
                 $taxVat = TaxManager::with(['getOutputGlAccount'])->where('slug', 'vat')->first();
                 $methodAccId = WaChartsOfAccount::where('id', $request->gl_account_id)->first();
                 $WaGlTran = [];
+                $WaStockMove = [];
                 $WaCashSalesItem = [];
                 $WaDebtorTran = [];
                 if ($request->gl_account_id == 41) {
@@ -2775,30 +2776,24 @@ Pending Bills Per Waiter
                         //	return response()->json(['status'=>false,'message'=>'('.$val->stockcode.') out of stock.']);	
                         $stock_qoh -= $val->quantity;
 
-                        // Use updateOrInsert to prevent duplicates
-                        \DB::table('wa_stock_moves')->updateOrInsert(
-                            [
-                                'document_no' => $grn_number,
-                                'wa_inventory_item_id' => $val->id,
-                                'wa_location_and_store_id' => $getUserData->wa_location_and_store_id,
-                                'type' => 'Sales Invoice', // Add type to make it more specific
-                            ],
-                            [
-                                'user_id' => $request->user_id,
-                                'restaurant_id' => $getUserData->restaurant_id,
-                                'standard_cost' => $val->standard_cost,
-                                'qauntity' => - ($val->quantity),
-                                'new_qoh' => $stock_qoh,
-                                'stock_id_code' => $val->stockcode,
-                                'grn_type_number' => $series_module->type_number,
-                                'shift_id' => $shiftdata->id ?? NULL,
-                                'grn_last_nuber_used' => $series_module->last_number_used,
-                                'price' => $val->price,
-                                'refrence' => $shiftdata->id ?? NULL,
-                                'updated_at' => date('Y-m-d H:i:s'),
-                                'created_at' => date('Y-m-d H:i:s'),
-                            ]
-                        );
+                        $WaStockMove[] = [
+                            'user_id' => $request->user_id,
+                            'restaurant_id' => $getUserData->restaurant_id,
+                            'wa_location_and_store_id' => $getUserData->wa_location_and_store_id,
+                            'wa_inventory_item_id' => $val->id,
+                            'standard_cost' => $val->standard_cost,
+                            'qauntity' => - ($val->quantity),
+                            'new_qoh' => $stock_qoh,
+                            'stock_id_code' => $val->stockcode,
+                            'grn_type_number' => $series_module->type_number,
+                            'shift_id' => $shiftdata->id ?? NULL,
+                            'grn_last_nuber_used' => $series_module->last_number_used,
+                            'price' => $val->price,
+                            'refrence' => $shiftdata->id ?? NULL,
+                            'document_no' => $grn_number,
+                            'updated_at' => date('Y-m-d H:i:s'),
+                            'created_at' => date('Y-m-d H:i:s'),
+                        ];
                         $vatrate = $taxVat->tax_value;
 
                         $totalPrice = $val->price * $val->quantity;
@@ -2967,7 +2962,9 @@ Pending Bills Per Waiter
                 if (count($WaCashSalesItem) > 0) {
                     WaCashSalesItem::insert($WaCashSalesItem);
                 }
-                // Stock moves are now inserted individually with updateOrInsert to prevent duplicates
+                if (count($WaStockMove) > 0) {
+                    WaStockMove::insert($WaStockMove);
+                }
                 if (count($WaGlTran) > 0) {
                     WaGlTran::insert($WaGlTran);
                 }
