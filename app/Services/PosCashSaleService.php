@@ -757,7 +757,8 @@ class PosCashSaleService
                 ]);
             }
 
-            self::stockMove($cashSales);
+            // Stock moves are now handled by PerformPostSaleActions job
+            // self::stockMove($cashSales); // REMOVED - causes duplication
 
             return true;
         } catch (\Exception $e) {
