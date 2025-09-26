@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Http\Request as HttpRequest;
 
 class HttpsProtocol
 {
@@ -13,7 +14,7 @@ class HttpsProtocol
      * @param  \Closure  $next
      * @return mixed
      */
-    public function handle($request, Closure $next)
+    public function handle(HttpRequest $request, Closure $next)
     {
         // if (!$request->secure() && App::environment() === 'production') {
             
