@@ -134,7 +134,7 @@ class SalesManShiftController extends Controller
                 r.route_name AS route_name,
                 r.id AS route_id,
                 r.tonnage_target,
-                (SELECT COUNT(*) FROM wa_route_customers wrc WHERE wrc.route_id = ss.route_id) AS total_customers,
+                (SELECT COUNT(*) FROM wa_route_customers wrc WHERE wrc.route_id = ss.route_id AND wrc.deleted_at IS NULL AND wrc.status = 'approved') AS total_customers,
                 (SELECT COUNT(DISTINCT wir.wa_route_customer_id) 
                  FROM wa_internal_requisitions wir 
                  WHERE wir.wa_shift_id = ss.id AND wir.wa_route_customer_id IS NOT NULL) AS met_customers_with_orders,
@@ -431,7 +431,7 @@ class SalesManShiftController extends Controller
         $model = "salesman-shifts";
         $shift = SalesmanShift::with(['salesman', 'relatedRoute', 'shiftCustomers', 'orders'])->find($id);
         $route = Route::find($shift->route_id);
-        $routeCustomers = WaRouteCustomer::where('route_id', $shift->route_id)->count();
+        $routeCustomers = WaRouteCustomer::where('route_id', $shift->route_id)->whereNull('deleted_at')->where('status', 'approved')->count();
         $data = [];
         $shiftTonnage = 0;
         $met_count = 0;
@@ -758,7 +758,7 @@ class SalesManShiftController extends Controller
                 ->map(function (SalesmanShift $shift) {
                     $shift->route_salesman = "{$shift->relatedRoute->route_name} ({$shift->salesman->name})";
                     if ($shift->status == 'not_started') {
-                        $shift->shift_customers_count = WaRouteCustomer::where('route_id', $shift->relatedRoute->id)->where('status', 'approved')->count();
+                        $shift->shift_customers_count = WaRouteCustomer::where('route_id', $shift->relatedRoute->id)->whereNull('deleted_at')->where('status', 'approved')->count();
                     }
 
                     $shift->display_status = ucwords(str_replace('_', ' ', $shift->status));
@@ -1637,7 +1637,7 @@ class SalesManShiftController extends Controller
 
         $shift = SalesmanShift::with(['salesman', 'relatedRoute', 'shiftCustomers', 'orders'])->find($id);
         $route = Route::find($shift->route_id);
-        $routeCustomers = WaRouteCustomer::where('route_id', $shift->route_id)->count();
+        $routeCustomers = WaRouteCustomer::where('route_id', $shift->route_id)->whereNull('deleted_at')->where('status', 'approved')->count();
         // $routeCustomers = $shift->shiftCustomers->count();
         $data = [];
         $shiftTonnage = 0;

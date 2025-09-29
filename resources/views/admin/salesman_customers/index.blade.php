@@ -27,7 +27,7 @@
         <div class="box-body">
             <!-- Route Information -->
             <div class="alert alert-info">
-                <strong>Route:</strong> {{ $user->getroute->route_name ?? 'Not Assigned' }} | 
+                <strong>Route:</strong> {{ $routeInfo->route_name ?? 'Not Assigned' }} | 
                 <strong>Total Customers:</strong> {{ $routeCustomers->count() }}
             </div>
         </div>

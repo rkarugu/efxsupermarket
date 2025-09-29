@@ -93,7 +93,7 @@
                         <span class="info-box-icon bg-red"><i class="fa fa-route"></i></span>
                         <div class="info-box-content">
                             <span class="info-box-text">Route</span>
-                            <span class="info-box-number">{{ $user->routes()->first()->route_name ?? 'Not Assigned' }}</span>
+                            <span class="info-box-number">{{ $routeInfo->route_name ?? 'Not Assigned' }}</span>
                         </div>
                     </div>
                 </div>

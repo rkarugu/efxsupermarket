@@ -7,6 +7,7 @@ use App\Model\WaRouteCustomer;
 use App\Model\WaCustomer;
 use App\Model\Route;
 use App\Model\DeliveryCentres;
+use App\SalesmanShift;
 use App\Interfaces\SmsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -47,8 +48,35 @@ class SalesmanCustomerController extends Controller
 
         // Get route customers for the salesman's route
         $routeCustomers = collect();
+        $userRoute = null;
+        $routeInfo = null;
+        
+        // Try multiple ways to get the route
         if ($user->route) {
-            $routeCustomers = WaRouteCustomer::where('route_id', $user->route)
+            $userRoute = $user->route;
+            $routeInfo = Route::find($userRoute);
+        } elseif ($user->getroute) {
+            $userRoute = $user->getroute->id;
+            $routeInfo = $user->getroute;
+        } elseif ($user->routes()->exists()) {
+            $firstRoute = $user->routes()->first();
+            $userRoute = $firstRoute->id;
+            $routeInfo = $firstRoute;
+        } else {
+            // Try to get route from the most recent shift
+            $recentShift = SalesmanShift::where('salesman_id', $user->id)
+                ->latest()
+                ->first();
+            if ($recentShift && $recentShift->route_id) {
+                $userRoute = $recentShift->route_id;
+                $routeInfo = Route::find($userRoute);
+            }
+        }
+        
+        if ($userRoute) {
+            $routeCustomers = WaRouteCustomer::where('route_id', $userRoute)
+                ->whereNull('deleted_at')
+                ->where('status', 'approved')
                 ->with(['center'])
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -62,7 +90,7 @@ class SalesmanCustomerController extends Controller
         $breadcum = [$title => '', 'Customer Management' => ''];
         
         return view('admin.salesman_customers.index', compact(
-            'title', 'model', 'breadcum', 'routeCustomers', 'deliveryCenters', 'user'
+            'title', 'model', 'breadcum', 'routeCustomers', 'deliveryCenters', 'user', 'routeInfo', 'userRoute'
         ));
     }
 
@@ -111,7 +139,25 @@ class SalesmanCustomerController extends Controller
 
         DB::beginTransaction();
         try {
-            $route = Route::find($user->route);
+            // Use the same route resolution logic as index method
+            $userRoute = null;
+            if ($user->route) {
+                $userRoute = $user->route;
+            } elseif ($user->getroute) {
+                $userRoute = $user->getroute->id;
+            } elseif ($user->routes()->exists()) {
+                $userRoute = $user->routes()->first()->id;
+            } else {
+                // Try to get route from the most recent shift
+                $recentShift = SalesmanShift::where('salesman_id', $user->id)
+                    ->latest()
+                    ->first();
+                if ($recentShift && $recentShift->route_id) {
+                    $userRoute = $recentShift->route_id;
+                }
+            }
+            
+            $route = Route::find($userRoute);
             if (!$route) {
                 return response()->json(['success' => false, 'message' => 'Route not found']);
             }
@@ -132,7 +178,7 @@ class SalesmanCustomerController extends Controller
             // Create route customer
             $routeCustomer = new WaRouteCustomer();
             $routeCustomer->created_by = $user->id;
-            $routeCustomer->route_id = $user->route;
+            $routeCustomer->route_id = $userRoute;
             $routeCustomer->delivery_centres_id = $request->center_id;
             $routeCustomer->customer_id = $customer->id;
             $routeCustomer->kra_pin = $request->kra_pin;

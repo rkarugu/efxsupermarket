@@ -70,9 +70,34 @@ class SalesmanOrderController extends Controller
 
         // Get route customers for the salesman's route
         $routeCustomers = collect();
-        $userRoute = $user->routes()->first(); // Get first assigned route
+        $userRoute = null;
+        $routeInfo = null;
+        
+        // Try multiple ways to get the route
+        if ($user->route) {
+            $userRoute = $user->route;
+            $routeInfo = Route::find($userRoute);
+        } elseif ($user->getroute) {
+            $userRoute = $user->getroute->id;
+            $routeInfo = $user->getroute;
+        } elseif ($user->routes()->exists()) {
+            $firstRoute = $user->routes()->first();
+            $userRoute = $firstRoute->id;
+            $routeInfo = $firstRoute;
+        } else {
+            // Try to get route from the most recent shift
+            $recentShift = SalesmanShift::where('salesman_id', $user->id)
+                ->latest()
+                ->first();
+            if ($recentShift && $recentShift->route_id) {
+                $userRoute = $recentShift->route_id;
+                $routeInfo = Route::find($userRoute);
+            }
+        }
+        
         if ($userRoute) {
-            $routeCustomers = WaRouteCustomer::where('route_id', $userRoute->id)
+            $routeCustomers = WaRouteCustomer::where('route_id', $userRoute)
+                ->whereNull('deleted_at')
                 ->where('status', 'approved')
                 ->orderBy('bussiness_name')
                 ->get();
@@ -81,7 +106,7 @@ class SalesmanOrderController extends Controller
         $breadcum = [$title => '', 'Dashboard' => ''];
         
         return view('admin.salesman_orders.index', compact(
-            'title', 'model', 'breadcum', 'activeShift', 'todaysOrders', 'routeCustomers', 'user'
+            'title', 'model', 'breadcum', 'activeShift', 'todaysOrders', 'routeCustomers', 'user', 'routeInfo', 'userRoute'
         ));
     }
 
