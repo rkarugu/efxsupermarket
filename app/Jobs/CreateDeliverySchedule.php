@@ -35,9 +35,11 @@ class CreateDeliverySchedule implements ShouldQueue
     public function handle(): void
     {
         try {
-            $customersWithOrders = SalesmanShiftCustomer::where('salesman_shift_id', $this->shift->id)
-                ->where('order_taken', true)
-                ->get();
+            // Get customers who have orders in this shift (using the same approach as our customer count fix)
+            $customersWithOrders = WaInternalRequisition::where('wa_shift_id', $this->shift->id)
+                ->whereNotNull('wa_route_customer_id')
+                ->distinct()
+                ->pluck('wa_route_customer_id');
 
             $schedule = DeliverySchedule::create([
                 'shift_id' => $this->shift->id,
@@ -46,14 +48,14 @@ class CreateDeliverySchedule implements ShouldQueue
                 'status' => 'consolidating'
             ]);
 
-            foreach ($customersWithOrders as $customer) {
+            foreach ($customersWithOrders as $customerId) {
                 $customerOrderIds = WaInternalRequisition::where('wa_shift_id', $this->shift->id)
-                    ->where('wa_route_customer_id', $customer->route_customer_id)
+                    ->where('wa_route_customer_id', $customerId)
                     ->pluck('id')
                     ->toArray();
 
                 $schedule->customers()->create([
-                    'customer_id' => $customer->route_customer_id,
+                    'customer_id' => $customerId,
                     'delivery_code' => random_int(100000, 999999),
                     'order_id' => implode(',', $customerOrderIds)
                 ]);

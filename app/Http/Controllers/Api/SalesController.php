@@ -4012,7 +4012,21 @@ Pending Bills Per Waiter
             $error = $this->validationHandle($validator->messages());
             return response()->json(['status' => false, 'message' => $error]);
         } else {
+            // Update shift status to closed
             WaShift::where('id', $request->shift_id)->update(['status' => 'close']);
+            
+            // Get the salesman shift record to dispatch jobs
+            $waShift = WaShift::find($request->shift_id);
+            $shift = $waShift?->salesmanShift;
+            
+            if ($shift) {
+                // Dispatch job to create loading schedule (parking list)
+                \App\Jobs\PrepareStoreParkingList::dispatch($shift);
+                
+                // Dispatch job to create delivery schedule
+                \App\Jobs\CreateDeliverySchedule::dispatch($shift);
+            }
+            
             return response()->json(['status' => true, 'message' => 'Shift closed successfully.']);
         }
     }

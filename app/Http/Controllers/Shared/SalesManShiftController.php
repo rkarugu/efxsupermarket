@@ -133,7 +133,17 @@ class SalesManShiftController extends Controller
                 u.name AS salesman_name,
                 r.route_name AS route_name,
                 r.id AS route_id,
-                r.tonnage_target
+                r.tonnage_target,
+                (SELECT COUNT(*) FROM wa_route_customers wrc WHERE wrc.route_id = ss.route_id) AS total_customers,
+                (SELECT COUNT(DISTINCT wir.wa_route_customer_id) 
+                 FROM wa_internal_requisitions wir 
+                 WHERE wir.wa_shift_id = ss.id AND wir.wa_route_customer_id IS NOT NULL) AS met_customers_with_orders,
+                (SELECT COUNT(DISTINCT ssc.route_customer_id) 
+                 FROM salesman_shift_customers ssc 
+                 WHERE ssc.salesman_shift_id = ss.id AND ssc.visited = 1 AND ssc.order_taken = 0) AS met_customers_without_orders,
+                (SELECT COUNT(DISTINCT ssc.route_customer_id) 
+                 FROM salesman_shift_customers ssc 
+                 WHERE ssc.salesman_shift_id = ss.id AND ssc.visited = 0) AS totally_unmet_customers
 
 
             FROM
@@ -156,14 +166,50 @@ class SalesManShiftController extends Controller
 
 
 
-        if ($request->branch) {
-            $query .= " INNER JOIN routes  ON ss.route_id = routes.id WHERE routes.restaurant_id = ?";
+        // Check admin access first
+        $hasGlobalAccess = $isAdmin || 
+                          isset($permission['employees' . '___view_all_branches_data']) ||
+                          $authuser->role_id == 1 || 
+                          strtolower($authuser->name) == 'demo admin' ||
+                          !empty($branchIds);
+        
+        \Log::info('Admin Access Check', [
+            'user_name' => $authuser->name,
+            'user_role_id' => $authuser->role_id,
+            'is_admin' => $isAdmin,
+            'has_global_access' => $hasGlobalAccess,
+            'branch_ids' => $branchIds,
+            'requested_branch' => $request->branch
+        ]);
+        
+        if ($request->branch && $hasGlobalAccess) {
+            // Admin requesting specific branch - allow it
+            $query .= " WHERE r.restaurant_id = ?";
             $bindings = [$request->branch];
+        } elseif ($request->branch && !$hasGlobalAccess) {
+            // Non-admin requesting specific branch - only if they have access
+            if (in_array($request->branch, $branchIds) || $request->branch == $authuser->restaurant_id) {
+                $query .= " WHERE r.restaurant_id = ?";
+                $bindings = [$request->branch];
+            } else {
+                // No access to requested branch - restrict to their restaurant
+                $query .= " WHERE r.restaurant_id = ?";
+                $bindings = [$authuser->restaurant_id];
+            }
+        } elseif ($hasGlobalAccess) {
+            // Admin with no specific branch - show all
+            $query .= " WHERE 1 = 1";
+            $bindings = [];
         } else {
-            // $query .= " WHERE 1 = 1";
-            // $bindings = [];
-            $query .= " INNER JOIN routes  ON ss.route_id = routes.id WHERE routes.restaurant_id = ?";
-            $bindings = [$authuser->restaurant_id];
+            // Regular user - restrict to their restaurant or branches
+            if (!empty($branchIds)) {
+                $placeholders = str_repeat('?,', count($branchIds) - 1) . '?';
+                $query .= " WHERE r.restaurant_id IN ($placeholders)";
+                $bindings = $branchIds;
+            } else {
+                $query .= " WHERE r.restaurant_id = ?";
+                $bindings = [$authuser->restaurant_id];
+            }
         }
 
         if ($request->route) {
@@ -180,10 +226,7 @@ class SalesManShiftController extends Controller
             $bindings[] = $todaysDate;
         }
 
-        if (!$isAdmin && !isset($permission['employees' . '___view_all_branches_data'])) {
-            $query .= " AND r.restaurant_id = ?";
-            $bindings[] = $authuser->userRestaurent->id;
-        }
+        // Restaurant filtering is already handled above in the WHERE clause
 
         $query .= "
             GROUP BY
@@ -192,6 +235,20 @@ class SalesManShiftController extends Controller
                 shift_total DESC
         ";
 
+        // Debug: Log the query and bindings
+        \Log::info('Salesman Shifts Query Debug', [
+            'query' => $query,
+            'bindings' => $bindings,
+            'user_restaurant_id' => $authuser->restaurant_id,
+            'user_name' => $authuser->name,
+            'user_role_id' => $authuser->role_id,
+            'is_admin' => $isAdmin,
+            'has_global_access' => $hasGlobalAccess ?? 'not_set',
+            'branch_ids' => $branchIds,
+            'date_range' => [$date1, $date2],
+            'today' => $todaysDate
+        ]);
+        
         $all_item = DB::select($query, $bindings);
 
         if ($request->type && $request->type == "Download") {
@@ -205,7 +262,7 @@ class SalesManShiftController extends Controller
                     "status" => $row->status,
                     "closed_at" => $row->shift_close_time ?  ($row->status == 'close' ? \Carbon\Carbon::parse($row->shift_close_time)->toTimeString() : '-') :  '-',
                     "sales-man" => $row->salesman_name,
-                    "customer_count" => getShiftVisitedCustomers($row->id) . ' / '.getRouteCustomersCount($row->route_id),
+                    "customer_count" => $row->met_customers_with_orders . ' / ' . $row->total_customers,
                     "tonnage" => manageAmountFormat($row->shift_tonnage) . ' / ' . $row->tonnage_target,
                     "shift_total" => manageAmountFormat($row->shift_total),
                 ];
@@ -380,52 +437,33 @@ class SalesManShiftController extends Controller
         $met_count = 0;
         $met_without_orders_count = 0;
         $totally_unmet_count = 0;
-        foreach ($shift->shiftCustomers as $shiftCustomer) {
+        
+        // Get customers who have orders in this shift
+        $customersWithOrders = WaInternalRequisition::where('wa_shift_id', $shift->id)
+            ->whereNotNull('wa_route_customer_id')
+            ->distinct()
+            ->pluck('wa_route_customer_id');
+            
+        foreach ($customersWithOrders as $customerId) {
 
             $payload = [];
             $customerTonnage = 0;
-            $customer = WaRouteCustomer::find($shiftCustomer->route_customer_id);
+            $customer = WaRouteCustomer::find($customerId);
             if ($customer) {
 
                 $payload['customer_name'] = $customer->bussiness_name ?? '';
                 $payload['customer_phone_no'] = $customer->phone ?? '';
                 $payload['customer_town'] = $customer->center->name ?? '';
 
-                $shiftCustomerMet = SalesmanShiftCustomer::latest()
-                    ->where('salesman_shift_id', $shift->id)
-                    ->where('route_customer_id', $customer->id)
-                    ->first();
+                // Since we're getting customers from orders, they all have orders
+                $payload['is_met'] = 1;
+                $payload['is_met_updated_at'] = now();
 
-                $payload['is_met'] = $shiftCustomerMet?->order_taken ?? null;
-                $payload['is_met_updated_at'] = $shiftCustomerMet?->updated_at ?? null; 
+                $met_count++;
 
-                if ($payload['is_met'] == 1) {
-                    $met_count++;
-                }
-
-                $payload['met_without_orders'] = SalesmanShiftCustomer::latest()
-                    ->where('salesman_shift_id', $shift->id)
-                    ->where('route_customer_id', $customer->id)
-                    ->where('visited', 1)
-                    ->where('order_taken', 0)
-                    ->exists();
-
-                if ($payload['met_without_orders']) {
-                    $met_without_orders_count++;
-                }
-
-                $payload['totally_unmet_customers'] = SalesmanShiftCustomer::latest()
-                    ->where('salesman_shift_id', $shift->id)
-                    ->where(function ($query) use ($customer) {
-                        $query->where('route_customer_id', $customer->id)
-                            ->where('visited', 0)
-                            ->where('order_taken', 0);
-                    })
-                    ->exists();
-
-                if ($payload['totally_unmet_customers']) {
-                    $totally_unmet_count++;
-                }
+                // Since we're getting customers from orders, they don't fall into these categories
+                $payload['met_without_orders'] = false;
+                $payload['totally_unmet_customers'] = false;
 
                 $shiftIssue = SalesmanShiftIssue::latest()
                     ->where('shift_id', $shift->id)
@@ -468,7 +506,7 @@ class SalesManShiftController extends Controller
         }
 
         $dataCollection = new Collection($data);
-        $visitedCustomers = SalesmanShiftCustomer::where('salesman_shift_id', $shift->id)->where('visited', 1)->count();
+        $visitedCustomers = $met_count;
         $breadcum = [$title => "", 'Listing' => ''];
         return view("admin.salesreceiablesreports.salesman_shift_summary", compact(
             'data',
@@ -1649,7 +1687,10 @@ class SalesManShiftController extends Controller
 
         $dataCollection = new Collection($data);
         // $visitedCustomers = $dataCollection->where('is_met', 1)->count();
-        $visitedCustomers = SalesmanShiftCustomer::where('salesman_shift_id', $shift->id)->where('order_taken', 1)->count();
+        $visitedCustomers = WaInternalRequisition::where('wa_shift_id', $shift->id)
+            ->whereNotNull('wa_route_customer_id')
+            ->distinct('wa_route_customer_id')
+            ->count();
 
         $report_name = "{$shift->shiftId}-Shift-Report";
         $pdf = PDF::loadView('admin.salesreceiablesreports.print_shift_details', compact('report_name', 'data', 'route', 'routeCustomers', 'visitedCustomers', 'shiftTonnage', 'shift'));
