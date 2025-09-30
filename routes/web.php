@@ -1668,6 +1668,8 @@ Route::any('/admin/pos/route-customer/store', [CustomerController::class, 'store
     Route::get('salesman-shifts/{id}/delivery-report', [SalesManShiftController::class, 'downloadDeliveryReport'])->name('salesman-shifts.delivery-report');
     Route::get('salesman-shifts/{id}/delivery-sheet', [SalesManShiftController::class, 'downloadDeliverySheet'])->name('salesman-shifts.delivery-sheet');
     Route::get('salesman-shifts/{id}/loading-sheet', [SalesManShiftController::class, 'downloadLoadingSheet'])->name('salesman-shifts.loading-sheet');
+    Route::get('salesman-shifts/{id}/debug-balance', [SalesManShiftController::class, 'debugInvoiceBalance'])->name('salesman-shifts.debug-balance');
+    Route::post('salesman-shifts/{id}/fix-balance', [SalesManShiftController::class, 'fixInvoiceBalance'])->name('salesman-shifts.fix-balance');
     Route::get('salesman-shifts/{id}/reopen-from-back-end', [SalesManShiftController::class, 'reopenShiftBe'])->name('salesman-shifts.reopen-shift-from-be');
 
 
