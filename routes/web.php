@@ -3415,6 +3415,10 @@ Route::group(['prefix' => 'admin', 'middleware' => ['AdminLoggedIn', 'ip-blocker
         Route::get('/test-search', [SalesmanOrderController::class, 'testSearch'])->name('test-search');
         Route::get('/debug-tax/{orderId}', [SalesmanOrderController::class, 'debugTax'])->name('debug-tax');
         Route::get('/fix-vat/{orderId}', [SalesmanOrderController::class, 'fixVatForOrder'])->name('fix-vat');
+        Route::get('/debug-loading-sheets', [SalesmanOrderController::class, 'debugLoadingSheets'])->name('debug-loading-sheets');
+        Route::get('/generate-loading-sheets/{shiftId?}', [SalesmanOrderController::class, 'generateLoadingSheets'])->name('generate-loading-sheets');
+        Route::get('/test-mobile-shift-closing/{shiftId}', [SalesmanOrderController::class, 'testMobileShiftClosing'])->name('test-mobile-shift-closing');
+        Route::get('/debug-entire-journey', [SalesmanOrderController::class, 'debugEntireJourney'])->name('debug-entire-journey');
         Route::post('/shift/open', [SalesmanOrderController::class, 'openShift'])->name('shift.open');
         Route::post('/shift/close', [SalesmanOrderController::class, 'closeShift'])->name('shift.close');
         Route::get('/{id}', [SalesmanOrderController::class, 'show'])->name('show');

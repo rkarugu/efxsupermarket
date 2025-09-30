@@ -17,6 +17,8 @@ use App\Model\WaStockMove;
 use App\SalesmanShift;
 use App\Model\WaNumerSeriesCode;
 use App\Jobs\PerformPostSaleActions;
+use App\Jobs\PrepareStoreParkingList;
+use App\Jobs\CreateDeliverySchedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -708,9 +710,13 @@ class SalesmanOrderController extends Controller
             $activeShift->closed_time = Carbon::now();
             $activeShift->save();
 
+            // Dispatch jobs to create loading schedule and delivery schedule
+            PrepareStoreParkingList::dispatch($activeShift);
+            CreateDeliverySchedule::dispatch($activeShift);
+
             return response()->json([
                 'success' => true, 
-                'message' => 'Shift closed successfully'
+                'message' => 'Shift closed successfully. Loading sheets and delivery schedules are being generated.'
             ]);
 
         } catch (\Exception $e) {
@@ -858,6 +864,232 @@ class SalesmanOrderController extends Controller
         
         $output .= "<br><strong>Updated {$updated} items with correct VAT calculations.</strong><br>";
         $output .= "<a href='" . route('salesman-orders.show', $orderId) . "'>View Updated Order</a>";
+        
+        return $output;
+    }
+
+    /**
+     * Debug loading sheets data
+     */
+    public function debugLoadingSheets()
+    {
+        $output = "<h2>Loading Sheets Debug</h2><br>";
+        
+        // Check recent shifts
+        $shifts = \App\SalesmanShift::latest()->limit(5)->get();
+        $output .= "<h3>Recent Salesman Shifts:</h3>";
+        
+        foreach($shifts as $shift) {
+            $output .= "<strong>Shift ID:</strong> {$shift->id}<br>";
+            $output .= "<strong>Status:</strong> {$shift->status}<br>";
+            $output .= "<strong>Date:</strong> {$shift->created_at}<br>";
+            
+            // Check dispatches
+            $dispatches = \App\SalesmanShiftStoreDispatch::where('shift_id', $shift->id)->get();
+            $output .= "<strong>Dispatches:</strong> " . $dispatches->count() . "<br>";
+            
+            foreach($dispatches as $dispatch) {
+                $output .= "&nbsp;&nbsp;- Dispatch ID: {$dispatch->id}, Dispatched: " . ($dispatch->dispatched ? 'Yes' : 'No') . "<br>";
+            }
+            
+            // Check orders
+            $orders = \App\Model\WaInternalRequisition::where('wa_shift_id', $shift->id)->count();
+            $output .= "<strong>Orders:</strong> {$orders}<br>";
+            
+            $output .= "<hr>";
+        }
+        
+        // Check all dispatches
+        $allDispatches = \App\SalesmanShiftStoreDispatch::where('dispatched', false)->count();
+        $output .= "<h3>Total Undispatched Loading Sheets:</h3>";
+        $output .= "<strong>Count:</strong> {$allDispatches}<br><br>";
+        
+        if($allDispatches > 0) {
+            $output .= "<strong>Undispatched Sheets:</strong><br>";
+            $undispatched = \App\SalesmanShiftStoreDispatch::where('dispatched', false)->with('shift')->get();
+            foreach($undispatched as $dispatch) {
+                $output .= "- Shift ID: {$dispatch->shift_id}, Dispatch ID: {$dispatch->id}, Store ID: {$dispatch->store_id}<br>";
+            }
+        }
+        
+        return $output;
+    }
+
+    /**
+     * Generate loading sheets for existing closed shifts
+     */
+    public function generateLoadingSheets($shiftId = null)
+    {
+        $output = "<h2>Generate Loading Sheets</h2><br>";
+        
+        if ($shiftId) {
+            // Generate for specific shift
+            $shift = SalesmanShift::find($shiftId);
+            if (!$shift) {
+                return "Shift not found";
+            }
+            
+            $shifts = collect([$shift]);
+            $output .= "<h3>Generating for Shift ID: {$shiftId}</h3>";
+        } else {
+            // Generate for recent closed shifts without dispatches
+            $shifts = SalesmanShift::where('status', 'close')
+                ->whereDoesntHave('dispatches')
+                ->latest()
+                ->limit(10)
+                ->get();
+            
+            $output .= "<h3>Generating for {$shifts->count()} recent closed shifts without loading sheets:</h3>";
+        }
+        
+        $generated = 0;
+        
+        foreach($shifts as $shift) {
+            try {
+                // Check if shift has orders
+                $orderCount = WaInternalRequisition::where('wa_shift_id', $shift->id)->count();
+                
+                if ($orderCount > 0) {
+                    // Dispatch the job
+                    PrepareStoreParkingList::dispatch($shift);
+                    CreateDeliverySchedule::dispatch($shift);
+                    
+                    $output .= "<strong>✓ Generated:</strong> Shift ID {$shift->id} ({$orderCount} orders)<br>";
+                    $generated++;
+                } else {
+                    $output .= "<strong>⚠ Skipped:</strong> Shift ID {$shift->id} (no orders)<br>";
+                }
+            } catch (\Exception $e) {
+                $output .= "<strong>✗ Error:</strong> Shift ID {$shift->id} - {$e->getMessage()}<br>";
+            }
+        }
+        
+        $output .= "<br><strong>Generated loading sheets for {$generated} shifts.</strong><br>";
+        $output .= "<br><a href='/admin/store-loading-sheets'>View Loading Sheets</a>";
+        
+        return $output;
+    }
+
+    /**
+     * Test the mobile API shift closing logic for existing shifts
+     */
+    public function testMobileShiftClosing($shiftId)
+    {
+        $output = "<h2>Test Mobile API Shift Closing Logic</h2><br>";
+        
+        // Find the WaShift record (mobile API uses WaShift table)
+        $waShift = \App\Model\WaShift::find($shiftId);
+        if (!$waShift) {
+            return "WaShift not found for ID: {$shiftId}";
+        }
+        
+        $output .= "<strong>WaShift Found:</strong> ID {$waShift->id}, Status: {$waShift->status}<br>";
+        $output .= "<strong>Salesman ID:</strong> {$waShift->salesman_id}<br>";
+        
+        // Check the relationship to SalesmanShift
+        $shift = $waShift->salesmanShift;
+        if (!$shift) {
+            $output .= "<strong>❌ Issue Found:</strong> No SalesmanShift record found for WaShift ID {$shiftId}<br>";
+            $output .= "<strong>This explains why loading sheets weren't generated!</strong><br><br>";
+            
+            // Check if there's a SalesmanShift with matching salesman_id and date
+            $possibleShifts = \App\SalesmanShift::where('salesman_id', $waShift->salesman_id)
+                ->whereDate('created_at', $waShift->created_at->toDateString())
+                ->get();
+                
+            if ($possibleShifts->count() > 0) {
+                $output .= "<strong>Possible SalesmanShift matches found:</strong><br>";
+                foreach($possibleShifts as $possibleShift) {
+                    $output .= "- SalesmanShift ID: {$possibleShift->id}, Status: {$possibleShift->status}<br>";
+                }
+            }
+        } else {
+            $output .= "<strong>✅ SalesmanShift Found:</strong> ID {$shift->id}, Status: {$shift->status}<br>";
+            
+            // Test dispatching the jobs
+            try {
+                PrepareStoreParkingList::dispatch($shift);
+                CreateDeliverySchedule::dispatch($shift);
+                $output .= "<strong>✅ Jobs dispatched successfully!</strong><br>";
+            } catch (\Exception $e) {
+                $output .= "<strong>❌ Error dispatching jobs:</strong> {$e->getMessage()}<br>";
+            }
+        }
+        
+        return $output;
+    }
+
+    /**
+     * Debug delivery schedules and the entire shift closing journey
+     */
+    public function debugEntireJourney()
+    {
+        $output = "<h2>Complete Shift Closing Journey Debug</h2><br>";
+        
+        // Check recent shifts
+        $shifts = \App\SalesmanShift::latest()->limit(5)->get();
+        $output .= "<h3>Recent Salesman Shifts:</h3>";
+        
+        foreach($shifts as $shift) {
+            $output .= "<strong>Shift ID:</strong> {$shift->id}<br>";
+            $output .= "<strong>Status:</strong> {$shift->status}<br>";
+            $output .= "<strong>Date:</strong> {$shift->created_at}<br>";
+            $output .= "<strong>Salesman ID:</strong> {$shift->salesman_id}<br>";
+            
+            // Check orders
+            $orders = \App\Model\WaInternalRequisition::where('wa_shift_id', $shift->id)->count();
+            $output .= "<strong>Orders:</strong> {$orders}<br>";
+            
+            // Check dispatches (loading sheets)
+            $dispatches = \App\SalesmanShiftStoreDispatch::where('shift_id', $shift->id)->get();
+            $output .= "<strong>Loading Sheets (Dispatches):</strong> " . $dispatches->count() . "<br>";
+            
+            // Check delivery schedules
+            $deliverySchedules = \App\DeliverySchedule::where('shift_id', $shift->id)->get();
+            $output .= "<strong>Delivery Schedules:</strong> " . $deliverySchedules->count() . "<br>";
+            
+            if ($deliverySchedules->count() > 0) {
+                foreach($deliverySchedules as $schedule) {
+                    $output .= "&nbsp;&nbsp;- Schedule ID: {$schedule->id}, Status: {$schedule->status}<br>";
+                }
+            }
+            
+            // Check if salesman has store location
+            if ($shift->salesman) {
+                $output .= "<strong>Salesman Store ID:</strong> " . ($shift->salesman->wa_location_and_store_id ?? 'NULL') . "<br>";
+            }
+            
+            $output .= "<hr>";
+        }
+        
+        // Check all delivery schedules
+        $allDeliverySchedules = \App\DeliverySchedule::latest()->limit(10)->get();
+        $output .= "<h3>Recent Delivery Schedules (All):</h3>";
+        
+        foreach($allDeliverySchedules as $schedule) {
+            $output .= "<strong>Schedule ID:</strong> {$schedule->id}<br>";
+            $output .= "<strong>Shift ID:</strong> {$schedule->shift_id}<br>";
+            $output .= "<strong>Status:</strong> {$schedule->status}<br>";
+            $output .= "<strong>Date:</strong> {$schedule->created_at}<br>";
+            $output .= "<hr>";
+        }
+        
+        // Check queue jobs
+        $output .= "<h3>Queue Status:</h3>";
+        try {
+            $failedJobs = \DB::table('failed_jobs')->count();
+            $output .= "<strong>Failed Jobs:</strong> {$failedJobs}<br>";
+            
+            if ($failedJobs > 0) {
+                $recentFailures = \DB::table('failed_jobs')->latest()->limit(5)->get();
+                $output .= "<strong>Recent Failed Jobs:</strong><br>";
+                foreach($recentFailures as $job) {
+                    $output .= "- {$job->payload} (Failed: {$job->failed_at})<br>";
+                }
+            }
+        } catch (\Exception $e) {
+            $output .= "<strong>Queue table not accessible:</strong> {$e->getMessage()}<br>";
+        }
         
         return $output;
     }
