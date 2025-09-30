@@ -234,7 +234,20 @@ class SalesmanOrderController extends Controller
             $dateTime = Carbon::now();
             $items = [];
             foreach ($request->items as $item) {
-                $inventoryItem = WaInventoryItem::find($item['wa_inventory_item_id']);
+                $inventoryItem = WaInventoryItem::with('taxManager')->find($item['wa_inventory_item_id']);
+                
+                // Calculate VAT using the same formula as SalesInvoiceController
+                $itemTotal = $item['quantity'] * $item['selling_price'];
+                $vatRate = 0;
+                $vatAmount = 0;
+                
+                if ($inventoryItem->taxManager) {
+                    $vatRate = (float)$inventoryItem->taxManager->tax_value;
+                    // VAT is already included in the selling price, so extract it
+                    $vatAmount = ($vatRate / (100 + $vatRate)) * $itemTotal;
+                }
+                
+                $totalWithVat = $itemTotal;
                 
                 $items[] = [
                     'wa_internal_requisition_id' => $requisition->id,
@@ -242,11 +255,11 @@ class SalesmanOrderController extends Controller
                     'quantity' => $item['quantity'],
                     'standard_cost' => $inventoryItem->standard_cost,
                     'selling_price' => $item['selling_price'],
-                    'total_cost' => $item['quantity'] * $item['selling_price'],
+                    'total_cost' => $itemTotal,
                     'tax_manager_id' => $inventoryItem->tax_manager_id,
-                    'vat_rate' => 0, // You may need to calculate this based on tax_manager
-                    'vat_amount' => 0, // You may need to calculate this
-                    'total_cost_with_vat' => $item['quantity'] * $item['selling_price'],
+                    'vat_rate' => $vatRate,
+                    'vat_amount' => $vatAmount,
+                    'total_cost_with_vat' => $totalWithVat,
                     'store_location_id' => $user->wa_location_and_store_id,
                     'hs_code' => $inventoryItem->hs_code,
                     'discount' => $item['discount'] ?? 0,
@@ -296,6 +309,7 @@ class SalesmanOrderController extends Controller
         $order = WaInternalRequisition::with([
                 'getRouteCustomer', 
                 'getRelatedItem.getInventoryItemDetail.pack_size',
+                'getRelatedItem.getInventoryItemDetail.taxManager',
                 'getrelatedEmployee',
                 'shift',
                 'route'
@@ -768,5 +782,83 @@ class SalesmanOrderController extends Controller
             'message' => 'Search route is working!',
             'timestamp' => now()
         ]);
+    }
+
+    /**
+     * Debug tax calculation for an order
+     */
+    public function debugTax($orderId)
+    {
+        $order = WaInternalRequisition::with(['getRelatedItem.getInventoryItemDetail.taxManager'])->find($orderId);
+        if (!$order) {
+            return "Order not found";
+        }
+        
+        $output = "<h2>Order: " . $order->requisition_no . "</h2><br>";
+        
+        foreach($order->getRelatedItem as $item) {
+            $output .= "<strong>Item:</strong> " . $item->getInventoryItemDetail->title . "<br>";
+            $output .= "<strong>Quantity:</strong> " . $item->quantity . "<br>";
+            $output .= "<strong>Selling Price:</strong> " . $item->selling_price . "<br>";
+            $output .= "<strong>Tax Manager ID:</strong> " . ($item->getInventoryItemDetail->tax_manager_id ?? 'NULL') . "<br>";
+            
+            if($item->getInventoryItemDetail->taxManager) {
+                $output .= "<strong>Tax Manager Title:</strong> " . $item->getInventoryItemDetail->taxManager->title . "<br>";
+                $output .= "<strong>Tax Value:</strong> " . $item->getInventoryItemDetail->taxManager->tax_value . "<br>";
+                
+                // Calculate VAT using SalesInvoiceController formula
+                $itemTotal = $item->quantity * $item->selling_price;
+                $vatRate = (float)$item->getInventoryItemDetail->taxManager->tax_value;
+                $vatAmount = ($vatRate / (100 + $vatRate)) * $itemTotal;
+                
+                $output .= "<strong>Item Total:</strong> " . $itemTotal . "<br>";
+                $output .= "<strong>VAT Rate:</strong> " . $vatRate . "<br>";
+                $output .= "<strong>Calculated VAT:</strong> " . number_format($vatAmount, 2) . "<br>";
+            } else {
+                $output .= "<strong>No Tax Manager assigned</strong><br>";
+            }
+            
+            $output .= "<strong>Stored VAT Amount:</strong> " . ($item->vat_amount ?? 'NULL') . "<br>";
+            $output .= "<hr>";
+        }
+        
+        return $output;
+    }
+
+    /**
+     * Fix VAT calculation for existing orders
+     */
+    public function fixVatForOrder($orderId)
+    {
+        $order = WaInternalRequisition::with(['getRelatedItem.getInventoryItemDetail.taxManager'])->find($orderId);
+        if (!$order) {
+            return "Order not found";
+        }
+        
+        $output = "<h2>Fixing VAT for Order: " . $order->requisition_no . "</h2><br>";
+        $updated = 0;
+        
+        foreach($order->getRelatedItem as $item) {
+            if($item->getInventoryItemDetail->taxManager) {
+                // Calculate VAT using SalesInvoiceController formula
+                $itemTotal = $item->quantity * $item->selling_price;
+                $vatRate = (float)$item->getInventoryItemDetail->taxManager->tax_value;
+                $vatAmount = ($vatRate / (100 + $vatRate)) * $itemTotal;
+                
+                // Update the item with correct VAT
+                WaInternalRequisitionItem::where('id', $item->id)->update([
+                    'vat_rate' => $vatRate,
+                    'vat_amount' => $vatAmount
+                ]);
+                
+                $output .= "<strong>Updated:</strong> " . $item->getInventoryItemDetail->title . " - VAT: " . number_format($vatAmount, 2) . "<br>";
+                $updated++;
+            }
+        }
+        
+        $output .= "<br><strong>Updated {$updated} items with correct VAT calculations.</strong><br>";
+        $output .= "<a href='" . route('salesman-orders.show', $orderId) . "'>View Updated Order</a>";
+        
+        return $output;
     }
 }

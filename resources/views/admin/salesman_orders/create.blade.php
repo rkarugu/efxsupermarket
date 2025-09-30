@@ -235,7 +235,7 @@ function setupTableHandlers() {
     
     // Handle quantity and price changes
     document.addEventListener('input', function(e) {
-        if (e.target.classList.contains('quantity') || e.target.classList.contains('selling_price') || e.target.classList.contains('discount')) {
+        if (e.target.classList.contains('quantity') || e.target.classList.contains('selling_price')) {
             const row = e.target.closest('tr');
             calculateRowTotal(row);
             calculateGrandTotal();
@@ -496,7 +496,6 @@ function addItemToCart(itemId, itemName, unitName, availableStock, sellingPrice)
         <td>${unitName}</td>
         <td><input type="number" name="items[${itemId}][quantity]" class="form-control quantity" min="1" max="${availableStock}" value="1"></td>
         <td><input type="number" name="items[${itemId}][selling_price]" class="form-control selling_price" step="0.01" value="${sellingPrice}"></td>
-        <td><input type="number" name="items[${itemId}][discount]" class="form-control discount" step="0.01" value="0"></td>
         <td class="total-cost">0.00</td>
         <td><button type="button" class="btn btn-danger btn-sm remove-item">Remove</button></td>
     `;
@@ -528,9 +527,8 @@ function addItemToCart(itemId, itemName, unitName, availableStock, sellingPrice)
 function calculateRowTotal(row) {
     const quantity = parseFloat(row.querySelector('.quantity').value) || 0;
     const price = parseFloat(row.querySelector('.selling_price').value) || 0;
-    const discount = parseFloat(row.querySelector('.discount').value) || 0;
     
-    const total = (quantity * price) - discount;
+    const total = quantity * price;
     row.querySelector('.total-cost').textContent = total.toFixed(2);
 }
 

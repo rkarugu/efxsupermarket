@@ -104,7 +104,18 @@
                             <td>{{ number_format($item->quantity, 2) }}</td>
                             <td>KSh {{ number_format($item->selling_price, 2) }}</td>
                             <td>KSh {{ number_format($item->discount ?? 0, 2) }}</td>
-                            <td>KSh {{ number_format($item->vat_amount ?? 0, 2) }}</td>
+                            @php
+                                $itemTotal = ($item->selling_price * $item->quantity) - ($item->discount ?? 0);
+                                $itemVat = 0;
+                                if ($item->getInventoryItemDetail && $item->getInventoryItemDetail->taxManager) {
+                                    $taxRate = (float)$item->getInventoryItemDetail->taxManager->tax_value;
+                                    // VAT is already included in the selling price, so extract it
+                                    $itemVat = ($taxRate / (100 + $taxRate)) * $itemTotal;
+                                }
+                                // Use stored VAT amount if available, otherwise calculate it
+                                $displayVat = $item->vat_amount ?? $itemVat;
+                            @endphp
+                            <td>KSh {{ number_format($displayVat, 2) }}</td>
                             <td>KSh {{ number_format($item->total_cost_with_vat, 2) }}</td>
                         </tr>
                         @endforeach
@@ -114,12 +125,23 @@
                             $subtotalWithoutVat = 0;
                             $totalVat = 0;
                             foreach($order->getRelatedItem as $item) {
-                                // Calculate subtotal without VAT
-                                $itemSubtotal = ($item->selling_price * $item->quantity) - ($item->discount ?? 0);
-                                $subtotalWithoutVat += $itemSubtotal;
+                                // Calculate item total (with VAT included)
+                                $itemTotal = ($item->selling_price * $item->quantity) - ($item->discount ?? 0);
                                 
-                                // Use stored VAT amount from database
-                                $totalVat += $item->vat_amount ?? 0;
+                                // Calculate VAT for each item using the same formula as SalesInvoiceController
+                                $itemVat = 0;
+                                if ($item->getInventoryItemDetail && $item->getInventoryItemDetail->taxManager) {
+                                    $taxRate = (float)$item->getInventoryItemDetail->taxManager->tax_value;
+                                    // VAT is already included in the selling price, so extract it
+                                    $itemVat = ($taxRate / (100 + $taxRate)) * $itemTotal;
+                                }
+                                
+                                // Use stored VAT amount if available, otherwise use calculated
+                                $actualVat = $item->vat_amount ?? $itemVat;
+                                $totalVat += $actualVat;
+                                
+                                // Subtotal without VAT = Total - VAT
+                                $subtotalWithoutVat += ($itemTotal - $actualVat);
                             }
                         @endphp
                         <tr class="bg-light-blue">

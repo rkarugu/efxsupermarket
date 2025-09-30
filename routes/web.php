@@ -3413,6 +3413,8 @@ Route::group(['prefix' => 'admin', 'middleware' => ['AdminLoggedIn', 'ip-blocker
         Route::get('/search-inventory', [SalesmanOrderController::class, 'searchInventory'])->name('search-inventory');
         Route::get('/get-item-details', [SalesmanOrderController::class, 'getItemDetails'])->name('get-item-details');
         Route::get('/test-search', [SalesmanOrderController::class, 'testSearch'])->name('test-search');
+        Route::get('/debug-tax/{orderId}', [SalesmanOrderController::class, 'debugTax'])->name('debug-tax');
+        Route::get('/fix-vat/{orderId}', [SalesmanOrderController::class, 'fixVatForOrder'])->name('fix-vat');
         Route::post('/shift/open', [SalesmanOrderController::class, 'openShift'])->name('shift.open');
         Route::post('/shift/close', [SalesmanOrderController::class, 'closeShift'])->name('shift.close');
         Route::get('/{id}', [SalesmanOrderController::class, 'show'])->name('show');
