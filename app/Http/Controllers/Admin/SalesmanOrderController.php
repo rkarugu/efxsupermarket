@@ -1093,4 +1093,86 @@ class SalesmanOrderController extends Controller
         
         return $output;
     }
+
+    /**
+     * Debug POS customer creation issue
+     */
+    public function debugPosCustomer()
+    {
+        $output = "<h2>POS Customer Creation Debug</h2><br>";
+        
+        // Check if default customer exists
+        $defaultCustomer = \App\Model\WaCustomer::where('customer_code', 'CUST-00001')->first();
+        
+        if ($defaultCustomer) {
+            $output .= "<strong>✅ Default Customer Found:</strong><br>";
+            $output .= "- Customer Code: {$defaultCustomer->customer_code}<br>";
+            $output .= "- Customer Name: {$defaultCustomer->customer_name}<br>";
+            $output .= "- ID: {$defaultCustomer->id}<br>";
+        } else {
+            $output .= "<strong>❌ Default Customer NOT Found:</strong> CUST-00001<br>";
+            $output .= "<strong>This is why POS customer creation is failing!</strong><br><br>";
+            
+            // Check what customers exist
+            $customers = \App\Model\WaCustomer::limit(10)->get();
+            $output .= "<strong>Existing Customers (first 10):</strong><br>";
+            foreach($customers as $customer) {
+                $output .= "- {$customer->customer_code}: {$customer->customer_name}<br>";
+            }
+            
+            // Suggest creating the default customer
+            $output .= "<br><strong>Solution:</strong> Create default customer CUST-00001<br>";
+            $output .= "<a href='/admin/salesman-orders/create-default-pos-customer' style='background: green; color: white; padding: 10px; text-decoration: none;'>Create Default Customer</a>";
+        }
+        
+        // Check POS routes
+        $user = auth()->user();
+        $posRoute = \App\Model\Route::where('is_pos_route', true)
+            ->where('restaurant_id', $user->restaurant_id ?? 1)
+            ->first();
+            
+        $output .= "<br><br><strong>POS Route Check:</strong><br>";
+        if ($posRoute) {
+            $output .= "✅ POS Route Found: {$posRoute->route_name} (ID: {$posRoute->id})<br>";
+        } else {
+            $output .= "❌ No POS Route found for restaurant ID: " . ($user->restaurant_id ?? 1) . "<br>";
+        }
+        
+        return $output;
+    }
+
+    /**
+     * Create default POS customer
+     */
+    public function createDefaultPosCustomer()
+    {
+        try {
+            // Check if already exists
+            $existing = \App\Model\WaCustomer::where('customer_code', 'CUST-00001')->first();
+            if ($existing) {
+                return "Default customer CUST-00001 already exists!";
+            }
+            
+            // Create default customer
+            $customer = new \App\Model\WaCustomer();
+            $customer->customer_code = 'CUST-00001';
+            $customer->customer_name = 'Default POS Customer';
+            $customer->telephone = '0700000000';
+            $customer->email = 'pos@default.com';
+            $customer->town = 'Default Town';
+            $customer->address = 'Default Location';
+            $customer->contact_person = 'POS Admin';
+            $customer->country = 'Kenya';
+            $customer->customer_since = now()->toDateString();
+            $customer->credit_limit = 0.00;
+            $customer->is_blocked = false;
+            $customer->delivery_centres_id = 1; // Default delivery center
+            $customer->save();
+            
+            return "<h2>✅ Success!</h2><br>Default POS customer CUST-00001 created successfully!<br><br><a href='/admin/pos-cash-sales/create'>Test POS Customer Creation</a>";
+            
+        } catch (\Exception $e) {
+            return "<h2>❌ Error!</h2><br>Failed to create default customer: " . $e->getMessage();
+        }
+    }
 }

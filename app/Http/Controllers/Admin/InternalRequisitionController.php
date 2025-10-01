@@ -201,7 +201,22 @@ class InternalRequisitionController extends Controller
         $model = $this->model;
         $breadcum = [$this->title => route($model . '.index'), 'Add' => ''];
         $row = WaInternalRequisition::whereSlug($slug)->first();
-        return view('admin.internalrequisition.print', compact('title', 'model', 'breadcum', 'row'));
+        $list = $row;
+        $itemsdata = WaInternalRequisitionItem::query()
+            ->select(
+                'wa_internal_requisition_items.*',
+                'wa_unit_of_measures.title as bin'
+            )
+            ->join('wa_inventory_items', 'wa_inventory_items.id', '=', 'wa_internal_requisition_items.wa_inventory_item_id')
+            ->join('wa_inventory_location_uom', function ($join) use ($list) {
+                $join->on('wa_inventory_items.id', '=', 'wa_inventory_location_uom.inventory_id')
+                    ->where('wa_inventory_location_uom.location_id', $list->to_store_id);
+            })
+            ->join('wa_unit_of_measures', 'wa_inventory_location_uom.uom_id', '=', 'wa_unit_of_measures.id')
+            ->where('wa_internal_requisition_items.wa_internal_requisition_id', $list->id)
+            ->orderBy('wa_inventory_items.stock_id_code', 'ASC')
+            ->get();
+        return view('admin.internalrequisition.print', compact('title', 'model', 'breadcum', 'row', 'list', 'itemsdata'));
     }
 
     public function exportToPdf($slug)

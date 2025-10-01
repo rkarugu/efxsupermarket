@@ -4,121 +4,47 @@
 <head>
     <style type="text/css">
         body {
-            font-family: 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif;
-            text-align: center;
-            color: #777;
-            margin: 0;
-            padding: 0;
-        }
-
-        body h1 {
-            font-weight: 300;
-            margin-bottom: 0px;
-            padding-bottom: 0px;
+            font-family: arial, sans-serif;
+            font-size: 12px;
+            margin: 20px;
             color: #000;
         }
 
-        body h3 {
-            font-weight: 300;
-            margin-top: 10px;
-            margin-bottom: 20px;
-            font-style: italic;
-            color: #555;
+        table {
+            border-collapse: collapse;
+            width: 100%;
         }
 
-        body a {
-            color: #06f;
+        td, th {
+            text-align: left;
+            padding: 4px 8px;
+            font-weight: bold;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        hr {
+            border: 1px solid #000;
+            margin: 5px 0;
+        }
+
+        .customer-details {
+            line-height: 1.4;
+            padding: 10px 0;
         }
 
         .invoice-box {
             margin: auto;
-            font-size: 11px;
-            line-height: 20px;
-            font-family: 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif;
-            color: #555;
-        }
-
-        .invoice-box * {
             font-size: 12px;
-        }
-
-        .invoice-box table {
-            width: 100%;
-            line-height: inherit;
-            text-align: left;
-            border-collapse: collapse;
-        }
-
-        .invoice-box table td {
-            padding: 3px;
-            vertical-align: top;
-        }
-
-        .invoice-box table tr td:last-child {
-            text-align: right;
-        }
-
-        .invoice-box table tr.top table td {
-            padding-bottom: 20px;
-        }
-
-        .invoice-box table tr.top table td.title {
-            font-size: 40px;
-            line-height: 40px;
-            color: #333;
-        }
-
-        .invoice-box table tr.information table td {
-            padding-bottom: 40px;
-        }
-
-        .invoice-box table tr.heading td {
-            background: #eee;
-            border-bottom: 1px solid #ddd;
-            font-weight: bold;
-        }
-
-        .invoice-box table tr.details td {
-            padding-bottom: 20px;
-        }
-
-        .invoice-box table tr.item td {
-            /* border-bottom: 1px solid #eee; */
-        }
-
-        .invoice-box table tr.item.last td {
-            border-bottom: none;
-        }
-
-        .invoice-box table tr.total td:nth-child(2) {
-            border-top: 2px solid #eee;
-            font-weight: bold;
-        }
-        .payment-table {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 20px;
-    }
-
-    .payment-table td {
-        width: 50%;
-        text-align: center;
-        vertical-align: top;
-    }
-        
-
-        @media only screen and (max-width: 600px) {
-            .invoice-box table tr.top table td {
-                width: 100%;
-                display: block;
-                text-align: center;
-            }
-
-            .invoice-box table tr.information table td {
-                width: 100%;
-                display: block;
-                text-align: center;
-            }
+            line-height: 20px;
+            font-family: arial, sans-serif;
+            color: #000;
         }
 
     </style>
@@ -130,80 +56,75 @@
 $getLoggeduserProfile = getLoggeduserProfile();
 ?>
 <div class="invoice-box">
-    <table style="text-align: center;">
-        <tbody>
-        <tr class="top">
-            <th colspan="2">
-                <span style="font-size:18px !important">{{ $all_settings['COMPANY_NAME']}}</span>
-            </th>
-        </tr>
-
-        <tr class="top">
-            <td colspan="2" style="text-align: center;">
-                {{ $all_settings['ADDRESS_1'] }}, {{ $all_settings['ADDRESS_2'] }}
+    <table style="width: 100%;">
+        <!-- Company Name & Address (centered) -->
+        <tr>
+            <td colspan="4" class="center">
+                <b style="font-size: 18px;">{{ strtoupper($all_settings['COMPANY_NAME']) }}</b>
             </td>
         </tr>
-        <tr class="top">
-            <td colspan="2" style="text-align: center;">
-                {{ $all_settings['PHONE_NUMBER'] }} | {{ $all_settings['EMAILS'] }} | {{ $all_settings['WEBSITE'] }}
+        <tr>
+            <td colspan="4" class="center">
+                <b>INVOICE</b>
             </td>
         </tr>
-        <tr class="top">
-            <td colspan="2" style="text-align: center;">
-                PIN NO: {{ $all_settings['PIN_NO'] }}
+        <tr>
+            <td colspan="4" class="center">
+                <b>{{ $all_settings['ADDRESS_1'] }}, {{ $all_settings['ADDRESS_2'] }}</b>
             </td>
         </tr>
-
+        <tr>
+            <td colspan="4" class="center">
+                <b>Mobile: {{ $all_settings['PHONE_NUMBER'] ?? '0740804489' }}</b>
+            </td>
+        </tr>
+        
         @if ($list->print_count > 1)
-            <tr class="top">
-                <td colspan="2">&nbsp;</td>
-            </tr>
-            <tr class="top">
-                <th colspan="2" style="text-align: center">
-                    <span style="font-size:18px !important">REPRINT {{$list->print_count-1}}</span>
-                </th>
-            </tr>
+        <tr>
+            <td colspan="4" class="center">
+                <b>REPRINT INVOICE COUNT: {{$list->print_count - 1}}</b>
+            </td>
+        </tr>
         @endif
-        </tbody>
+        
+        <!-- Horizontal Line -->
+        <tr>
+            <td colspan="4"><hr></td>
+        </tr>
+        
+        <!-- Customer Details Section -->
+        <tr>
+            <td colspan="4" style="text-align: left; padding: 10px 0; line-height: 1.4;">
+                @php
+                    $customer = $list->get_customer;
+                    $shift_id = \App\SalesmanShift::find($list->shift_id);
+                @endphp
+                <b>Invoice No.: {{$list->transfer_no}}</b><br>
+                <b>Company PIN: {{$all_settings['PIN_NO'] ?? 'Https://testing.com'}}</b><br>
+                <b>Customer PIN: {{$list->customer_pin ?? $customer->kra_pin ?? ''}}</b><br>
+                <b>Customer Name: {{$customer->customer_name ?? $list->name}}</b><br>
+                <b>Date: {{date('d/m/Y H:i', strtotime($list->transfer_date))}}</b><br>
+                <b>Served By: {{$list->user->name ?? getLoggeduserProfile()->name}}</b><br>
+                <b>Customer Account: {{$customer->account_type ?? 'TEST BUSINESS'}}</b><br>
+                <b>Mobile: {{$list->customer_phone_number ?? $customer->telephone ?? '0700'}}</b><br>
+                <b>B/F: KSh {{number_format($customer->balance ?? 100, 2)}}</b>
+            </td>
+        </tr>
+        
+        <!-- Horizontal Line -->
+        <tr>
+            <td colspan="4"><hr></td>
+        </tr>
     </table>
 
-    <table>
-        <tbody>
-        <tr class="top">
-            @php
-                $customer = $list->get_customer;
-                $shift_id = \App\SalesmanShift::find($list->shift_id);
-            @endphp
-            <th colspan="1" style="text-align: left;">ACC NO: {{ $customer->customer_name }} | {{@$customer->telephone}}</th>
-            <th colspan="1" style="text-align: right;">Invoice NO: {!! $list->transfer_no!!}</th>
-        </tr>
-        <tr class="top">
-            <th colspan="1" style="text-align: left;">Customer Name: {{$list->name}}</th>
-            <th colspan="1" style="text-align: right;">ShiftId: {!! @$shift_id->shift_id !!}</th>
-        </tr>
-        <tr class="top">
-            <th colspan="1" style="text-align: left;">Customer PIN: {{$list->customer_pin ?? $customer->kra_pin}}</th>
-            <th colspan="1" style="text-align:right">DATE: {!! date('Y-m-d H:i:s',strtotime($list->transfer_date))!!}</th>
-        </tr>
-        <tr class="top">
-            <th colspan="2" style="text-align: left;">Customer Phone Number: {{$list->customer_phone_number}}</th>
-        </tr>
-        </tbody>
-    </table>
-
-    <br>
-
-    <table>
-        <tbody>
-        <tr class="heading">
-            <td style="width: 10%;">Code</td>
-            <td style="width: 31%;">Description</td>
-            <td style="width: 6%;">Qty</td>
-            <td style="width: 12%;">Price</td>
-            <td style="width: 12%;">Amount</td>
-            <td style="width: 10%;">Disc</td>
-            <td style="width: 8%;">Vat%</td>
-            <td style="width: 11%;">Total</td>
+    <!-- Items Table -->
+    <table style="width:100%; border-collapse: collapse;">
+        <!-- Table Headers -->
+        <tr style="border-bottom: 2px solid #000;">
+            <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Item</b></td>
+            <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Qty</b></td>
+            <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Price</b></td>
+            <td style="font-weight: bold; text-align: right; padding: 8px;"><b>Amount</b></td>
         </tr>
         @php
             $TONNAGE = 0;
@@ -211,18 +132,33 @@ $getLoggeduserProfile = getLoggeduserProfile();
             $totalDiscount = 0;
             $netAmount = 0;
             $totalVat = 0;
+            $totalItems = count($list->getRelatedItem);
         @endphp
-        @foreach($list->getRelatedItem as $item)
-            <tr class="item">
-                <td>{{$item->getInventoryItemDetail->stock_id_code}}</td>
-                <td>{{$item->getInventoryItemDetail->title}}</td>
-                <td>{{floor($item->quantity)}}</td>
-                <td>{{manageAmountFormat($item->selling_price)}}</td>
-                <td>{{manageAmountFormat($item->quantity*$item->selling_price)}}</td>
-                <td>{{manageAmountFormat($item->getDiscount())}}</td>
-                <td>{{$item->vat_rate}}</td>
-                <td>{{manageAmountFormat($item->total_cost_with_vat)}}</td>
+        
+        @foreach($list->getRelatedItem as $index => $item)
+            <!-- Item Row -->
+            <tr>
+                <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
+                    <b>{{$index + 1}} {{strtoupper($item->getInventoryItemDetail->title)}}</b><br>
+                    <b>Pc(s)</b>
+                </td>
+                <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
+                    <b>{{number_format($item->quantity, 2)}}</b>
+                </td>
+                <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
+                    <b>x {{number_format($item->selling_price, 2)}}</b>
+                </td>
+                <td style="font-weight: bold; text-align: right; padding: 8px; vertical-align: top;">
+                    <b>{{number_format($item->quantity * $item->selling_price, 2)}}</b>
+                </td>
             </tr>
+            
+            @if($index < $totalItems - 1)
+            <!-- Horizontal Line between items -->
+            <tr>
+                <td colspan="4" style="padding: 0;"><hr style="border: 1px solid #000; margin: 5px 0;"></td>
+            </tr>
+            @endif
 
             @php
                 $gross_amount += (($item->quantity*$item->selling_price)-$item->getDiscount());
@@ -236,205 +172,99 @@ $getLoggeduserProfile = getLoggeduserProfile();
                 $totalVat += $vat;
             @endphp
         @endforeach
-        </tbody>
     </table>
 
-    <table>
-        <tbody>
-        <tr style="border-top: 2px dashed #cecece;">
-            <td colspan="5"></td>
-        </tr>
+    <hr>
 
-        <tr>
-            <td colspan="3">{{count($list->getRelatedItem)}} Lines</td>
-            <td style="text-align: right;" colspan="1">Gross Amount:</td>
-            <td>{{manageAmountFormat($gross_amount)}}</td>
+    <!-- Summary Section -->
+    <table style="width: 100%; border-collapse: collapse;">
+        <tr> 
+            <td style="text-align: left; font-weight: bold; padding: 8px; width: 70%;"><b>No of Items</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px; width: 30%;"><b>{{count($list->getRelatedItem)}}</b></td>
         </tr>
-        <tr>
-            <td colspan="1">Prepared by: {{@$list->user->name}}</td>
-            <td>Time: {{date('H:i A',strtotime($list->created_at))}}</td>
-            <td colspan="1">Delivered By: ___________</td>
-            <td style="text-align: right;" colspan="1">Discount:</td>
-            <td>{{manageAmountFormat($totalDiscount)}}</td>
+        <tr> 
+            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>Subtotal:</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($gross_amount - $totalVat, 2)}}</b></td>
         </tr>
-        <tr>
-            <td colspan="3"></td>
-            <td style="text-align: right;" colspan="1">Net Amount:</td>
-            <td>{{ manageAmountFormat(($gross_amount - $totalVat) ?? 0.00) }}</td>
+        <tr> 
+            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>VAT</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($totalVat, 2)}}</b></td>
         </tr>
-        <tr>
-            <td colspan="3"></td>
-            <td style="text-align: right;" colspan="1">V.A.T:</td>
-            <td>{{manageAmountFormat($totalVat ?? 0.00)}}</td>
+        <tr> 
+            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>TOTAL INVOICE AMNT:</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($gross_amount, 2)}}</b></td>
         </tr>
-        <tr>
-            <td colspan="2">Received By: ______________</td>
-            <td colspan="1">Sign: ______________</td>
-            <td colspan="1">TONNAGE : {{manageAmountFormat($TONNAGE)}}</td>
-            <td colspan="1" style="text-align: center;">
-                <hr style="border: 1px dashed #7b7b7b;">
-            </td>
+        <tr> 
+            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>CURRENT DUE AMOUNT</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($gross_amount, 2)}}</b></td>
         </tr>
-        <tr>
-            <td colspan="1"></td>
-            <td colspan="1">RUBBER STAMP</td>
-            <td colspan="1"></td>
-            <td colspan="1" style="text-align: right;">Total:
-                <hr style="border: 2px dashed #979797;">
-            </td>
-            <td colspan="1">
-                {{manageAmountFormat($gross_amount)}}
-                <hr style="border: 2px dashed #979797;">
-            </td>
+        <tr> 
+            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>ACCOUNT BALANCE</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(100, 2)}}</b></td>
         </tr>
-        <tr>
-            <td colspan="3">Amount in Words
-                <br>
-                {{strtoupper(getCurrencyInWords($gross_amount))}}
-            </td>
-            @php
+    </table>
 
-            @endphp
-            @php
-                $invoices = \App\Model\WaInventoryLocationTransfer::where('shift_id',@$list->shift_id)->pluck('id')->toArray();
-                $invoicesItems = \App\Model\WaInventoryLocationTransferItem::whereIn('wa_inventory_location_transfer_id',$invoices)->sum('total_cost_with_vat');
-                $balance = $invoicesItems;
-                $customer = $list->get_customer;
-                if ($customer->is_invoice_customer)
-                    {
-                          $balance = \App\Model\WaDebtorTran::where('wa_customer_id', $customer->id)->sum('amount');
-                    }
+    <hr>
 
-            @endphp
-
-            <td colspan="1">A/C Balance : {{manageAmountFormat($balance)}}</td>
-            <td colspan="1">Change: {{$list->change}}</td>
-        </tr>
-        <tr>
-            <td colspan="5"></td>
-        </tr>
-        <tr>
-            <td colspan="5"></td>
-        </tr>
-        <tr>
-            <td colspan="5"></td>
-        </tr>
-        @if ($getLoggeduserProfile->upload_data == 0)
+    <!-- CU INFORMATION Section -->
+    <div style="width: 100%; text-align: center; margin-top: 20px;">
+        <table style="width: 100%; border-collapse: collapse;">
             <tr>
-                <td colspan="5" style="text-align:center">{{($list->upload_data)}}</td>
-
+                <td colspan="2" style="text-align: center; font-weight: bold; font-size: 16px; padding: 10px;">
+                    <b>CU INFORMATION</b>
+                </td>
             </tr>
-        @endif
-        </tbody>
-    </table>
-
-
-    @if(!empty($esd_details))
-
-        <div style="width:100%; padding: 10px; text-align:left;">
-            <div style="width:20%;  float: left;">
-                @if($esd_details->verify_url!="")
-
+            <tr>
+                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
+                    <b>Date: {{date('d/m/Y', strtotime($list->transfer_date))}} Time: {{date('H:i:s A', strtotime($list->transfer_date))}}</b>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
+                    <b>SCU ID:</b>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
+                    <b>DIGITAX ID: sale_01K15DQMBB8RT9JTK9FP1K6J2H</b>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
+                    <b>SCU INVOICE NO: {{$list->transfer_no ?? '210'}}</b>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
+                    <b>Internal Data:</b>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
+                    <b>Receipt Signature:</b>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center; padding: 20px;">
+                    <!-- Static QR Code -->
+                    @php
+                        $qrCodeUrl = "https://itax.kra.go.ke/KRA-Portal/invoiceChk.htm?actionCode=loadPage&invoiceNo=" . $list->transfer_no;
+                    @endphp
                     @if(isset($is_print))
-                        {{ QrCode::size(120)->generate($esd_details->verify_url) }}
+                        {{ QrCode::size(100)->generate($qrCodeUrl) }}
                     @else
-                        <img src="data:image/png;base64, {!! base64_encode(QrCode::size(120)->generate($esd_details->verify_url)) !!} ">
+                        <img src="data:image/png;base64, {!! base64_encode(QrCode::size(100)->generate($qrCodeUrl)) !!} ">
                     @endif
-
-                @endif
-            </div>
-            <div style="width:80%; text-align:left;  float: left;">
-                CU Serial No : {{ $esd_details->cu_serial_number }}<br>
-                <p> CU Invoice Number : {{ $esd_details->cu_invoice_number }} </p>
-            </div>
-        </div>
-    @else
-        <div style="width:100%; padding: 10px; text-align:left;">
-            <div style="width:20%;  float: left;">
-                @php
-                    $qrCodeUrl="https://itax.kra.go.ke/KRA-Portal/invoiceChk.htm?actionCode=loadPage&invoiceNo=0040094030000023930-";
-                @endphp
-
-                @if(isset($is_print))
-                    {{ QrCode::size(70)->generate($qrCodeUrl) }}
-                @else
-                    <img src="data:image/png;base64, {!! base64_encode(QrCode::size(70)->generate($qrCodeUrl)) !!} ">
-                @endif
-            </div>
-        </div>
-    @endif
-    <div style="margin-top: 70px; padding-top: 70px;">
-        {{-- <hr style="border: none; border-top: 1px solid #000; text-align: center; margin-top: 20px;"> --}}
-        <span style="position: relative; top: -12px; background-color: white; padding: 0 10px;">
-            <span style="font-size: 20px; letter-spacing: 5px;">********</span>
-            <span style="font-weight: bold;">Payment Details</span>
-            <span style="font-size: 20px; letter-spacing: 5px;">********</span>
-        </span>
-        <h4>(PLEASE DO NOT MAKE CASH PAYMENTS TO OUR STAFF. THE COMPANY WILL NOT BE LIABLE FOR ANY LOSS RESULTING FROM CASH TRANSACTIONS.)</h4>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center; font-weight: bold; padding: 10px;">
+                    <b>MPESA TILL NO: 166538 NO CASH PAYMENT ON DELIVERY!</b>
+                </td>
+            </tr>
+        </table>
     </div>
 
-    @if(isset($restaurant))
-        <div class="payment-details">
-            @php
-                $paybills = [$restaurant->kcb_mpesa_paybill];
-                // shuffle($paybills);
-            @endphp
-
-            <div class="bank-section">
-                <p>MPESA Paybill: <span style="font-size: 13px; font-weight: bold;">{{ $paybills[0] }}</span></p>
-                <p>Account Number: <span style="font-size: 13px; font-weight: bold;">{{$payment_code}}</span></p>
-            </div>
-            <div class="bank-section">
-                <p>Vooma Paybill : <span style="font-size: 13px; font-weight: bold;">{{$restaurant->kcb_vooma_paybill}}</span></p>
-                <p>Account Number: <span style="font-size: 13px; font-weight: bold;">{{$payment_code}}</span></p>
-            </div>
-            <div class="bank-section">
-                <p>Equity Biller Number: <span style="font-size: 13px; font-weight: bold;">{{$restaurant->equity_paybill}}</span></p>
-                <p>Account Number: <span style="font-size: 13px; font-weight: bold;">{{$payment_code}}</span></p>
-            </div>
-            <div class="bank-section">
-                <p>{{ $all_settings['INVOICE_NOTE'] }}</p>
-
-            </div>
-        </div>
-
-    @endif
-
-    
-    <div>
-        
-    </div>
-    
-
-   {{-- <table>--}}
-{{--        <tr>--}}
-{{--            <td>--}}
-{{--                <b>PAYMENT REF:</b>--}}
-{{--            </td>--}}
-{{--            <td>--}}
-{{--                How to pay via MPESA--}}
-{{--            </td>--}}
-{{--        </tr>--}}
-{{--        <tr>--}}
-{{--            <td>--}}
-{{--                0000--}}
-{{--                --}}{{--        {{ $ref }}--}}
-{{--            </td>--}}
-{{--            <td>--}}
-{{--                Paybill <b>522533</b>--}}
-{{--            </td>--}}
-
-{{--        </tr>--}}
-{{--        <tr>--}}
-{{--            <td>--}}
-
-{{--            </td>--}}
-{{--            <td>--}}
-{{--                <b>7652611#0000</b>--}}
-{{--                --}}{{--        <b>7652611#{{ $ref }}</b>--}}
-{{--            </td>--}}
-{{--        </tr>--}}
-{{--    </table> --}}
 
 </div>
 

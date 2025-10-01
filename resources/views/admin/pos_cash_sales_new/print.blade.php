@@ -115,27 +115,40 @@
     <div class="invoice-box">
         <table  style="text-align: center;">
             <tbody>
+                <!-- Company Name & Address (centered) -->
                 <tr class="top">
                     <th colspan="3">
-                        <h2 style="font-size:18px !important">{{getAllSettings()['COMPANY_NAME']}}</h2>
+                        <h2 style="font-size:18px !important; font-weight: bold;">{{getAllSettings()['COMPANY_NAME']}}</h2>
                     </th>
                 </tr>
                 <tr class="top">
-                    <td colspan="3" style="    text-align: center;">{{getAllSettings()['ADDRESS_2']}}</td>
+                    <td colspan="3" style="text-align: center; font-weight: bold;">{{getAllSettings()['ADDRESS_2']}}</td>
                 </tr>
+                <!-- Company phone number (centered) -->
                 <tr class="top">
-                    <!-- <th  colspan="1" style="width: 50%">
-                        VAT NO:
-                    </th> -->
-                    <th colspan="1" style="width: 33%;text-align:left">
-                        PIN NO: {{getAllSettings()['PIN_NO']}}
-                    </th>
-                    <th colspan="1"  style="width: 33%;text-align:center">CASH SALE NO: {{$data->sales_no}}</th>
-                    <th colspan="1" style="width: 33%;text-align:right">DATE: {{date('d-M-Y',strtotime($data->date))}}</th>
-
+                    <td colspan="3" style="text-align: center; font-weight: bold;">Mobile: {{getAllSettings()['PHONE'] ?? '0740804489'}}</td>
                 </tr>
+                <!-- Horizontal Line -->
                 <tr class="top">
-                    <th  colspan="3" style="width: 100%;text-align:left">{{$data->customer}}</th>
+                    <td colspan="3"><hr style="border: 1px solid #000; margin: 5px 0;"></td>
+                </tr>
+                <!-- Customer Details Section (left-aligned) -->
+                <tr class="top">
+                    <td colspan="3" style="text-align: left; font-weight: bold; padding: 10px 0;">
+                        <div style="line-height: 1.4;">
+                            Invoice No.: {{$data->sales_no}}<br>
+                            Company PIN: {{getAllSettings()['PIN_NO']}}<br>
+                            Customer PIN: {{$data->customer_pin ?? ''}}<br>
+                            Customer Name: {{$data->customer}}<br>
+                            Date: {{date('d/m/Y H:i',strtotime($data->date . ' ' . $data->time))}}<br>
+                            Served By: {{@$data->user->name}}<br>
+                            Telephone No: {{$data->customer_phone ?? ''}}<br>
+                        </div>
+                    </td>
+                </tr>
+                <!-- Horizontal Line -->
+                <tr class="top">
+                    <td colspan="3"><hr style="border: 1px solid #000; margin: 5px 0;"></td>
                 </tr>
                 @if ($data->print_count > 1)
                     <tr class="top">
@@ -156,93 +169,91 @@
         <table>
             <tbody>
                 <tr class="heading">
-					<td style="width: 8%;">Code</td>
-					<td style="width: 32%;">Description</td>
-					<td style="width: 7%;">Qty</td>
-					<td style="width: 8%;">RTN-Qty</td>
-					<td style="width: 9%;">Price</td>
-					<td style="width: 10%;">Amount</td>
-					<td style="width: 8%;text-align:right;padding-right:2px">Disc</td>
-					<td style="width: 8%;text-align:right;padding-right:2px">Vat%</td>
-					<td style="width: 10%;">Total</td>
+					<td style="width: 5%; font-weight: bold;">No</td>
+					<td style="width: 10%; font-weight: bold;">Code</td>
+					<td style="width: 35%; font-weight: bold;">Description</td>
+					<td style="width: 8%; font-weight: bold;">Qty</td>
+					<td style="width: 10%; font-weight: bold;">Price</td>
+					<td style="width: 12%; font-weight: bold;">Amount</td>
+					<td style="width: 8%;text-align:right;padding-right:2px; font-weight: bold;">Disc</td>
+					<td style="width: 8%;text-align:right;padding-right:2px; font-weight: bold;">Vat%</td>
+					<td style="width: 10%; font-weight: bold;">Total</td>
 				</tr>
                 @php
                     $TONNAGE = $gross_amount = 0;
+                    $itemNumber = 1;
+                    $totalItems = count($data->items);
                 @endphp
-                @foreach ($data->items as $item)
+                @foreach ($data->items as $index => $item)
                     <tr class="item">
-                        <td>{{@$item->item->stock_id_code}}</td>
-                        <td>{{@$item->item->description}}</td>
-                        <td>{{((int)$item->qty)}}</td>
-                        <td>{{((int)$item->return_quantity)}}</td>
-                        <td>{{manageAmountFormat($item->selling_price)}}</td>
-                        <td>{{manageAmountFormat($item->qty*$item->selling_price)}}</td>
-                        <td>{{manageAmountFormat($item->discount_amount)}}</td>
-                        <td>{{$item->vat_percentage}}</td>
-                        <td>{{manageAmountFormat($item->qty*$item->selling_price)}}</td>
+                        <td style="font-weight: bold;">{{$itemNumber}}</td>
+                        <td style="font-weight: bold;">{{@$item->item->stock_id_code}}</td>
+                        <td style="font-weight: bold;">{{@$item->item->description}}</td>
+                        <td style="font-weight: bold;">{{((int)$item->qty)}}</td>
+                        <td style="font-weight: bold;">{{manageAmountFormat($item->selling_price)}}</td>
+                        <td style="font-weight: bold;">{{manageAmountFormat($item->qty*$item->selling_price)}}</td>
+                        <td style="font-weight: bold;">{{manageAmountFormat($item->discount_amount)}}</td>
+                        <td style="font-weight: bold;">{{$item->vat_percentage}}</td>
+                        <td style="font-weight: bold;">{{manageAmountFormat($item->qty*$item->selling_price)}}</td>
                     </tr>
+                    
+                    @if($index < $totalItems - 1)
+                        <!-- Horizontal Line between items -->
+                        <tr>
+                            <td colspan="9"><hr style="border: 1px solid #000; margin: 2px 0;"></td>
+                        </tr>
+                    @endif
 
                     @php
                         $TONNAGE += ($item->item->net_weight ?? 1) * $item->qty;
                         $gross_amount += ($item->qty*$item->selling_price) - $item->discount_amount;
+                        $itemNumber++;
                     @endphp
                 @endforeach
                 </tbody>
         </table>
+        <hr style="border: 1px solid #000; margin: 5px 0;">
         <table>
             <tbody>
-                
                 <tr >
-					<td colspan="5"></td>
-				</tr>
-
-                <tr >
-					<td colspan="3">{{count($data->items)}} Lines</td>
-					<td style="text-align: right;" colspan="1">Gross Amount:</td>
-					<td  colspan="1">{{manageAmountFormat($gross_amount)}}</td>
+					<td colspan="3" style="text-align: left; font-weight: bold;">No of Items:</td>
+					<td colspan="2" style="text-align: right; font-weight: bold;">{{count($data->items)}}</td>
 				</tr>
                 <tr >
-					<td colspan="2" ><div style="display:flex"><span style="width:65%">Prepared by: {{@$data->user->name}}</span> <span style="width:35%;float:right">Time: {{date('H:i A',strtotime($data->time))}}</span></div></td>
-					
-					<td colspan="1">Delivered By: </td>
-					<td style="text-align: right;" colspan="1">Discount:</td>
-					<td colspan="1">{{manageAmountFormat($data->items->sum('discount_amount') ?? 0.00)}}</td>
+					<td colspan="3" style="text-align: left; font-weight: bold;">Subtotal:</td>
+					<td colspan="2" style="text-align: right; font-weight: bold;">{{manageAmountFormat($gross_amount - ($data->items->sum('vat_amount') ?? 0.00))}}</td>
 				</tr>
                 <tr >
-					<td colspan="3"></td>
-					<td style="text-align: right;" colspan="1">Net Amount:</td>
-					<td  colspan="1">{{manageAmountFormat($gross_amount - ($data->items->sum('vat_amount') ?? 0.00))}}</td>
+					<td colspan="3" style="text-align: left; font-weight: bold;">Discount:</td>
+					<td colspan="2" style="text-align: right; font-weight: bold;">{{manageAmountFormat($data->items->sum('discount_amount') ?? 0.00)}}</td>
 				</tr>
                 <tr >
-					<td colspan="3"></td>
-					<td style="text-align: right;" colspan="1">V.A.T:</td>
-					<td  colspan="1">{{manageAmountFormat($data->items->sum('vat_amount') ?? 0.00)}}</td>
+					<td colspan="3" style="text-align: left; font-weight: bold;">VAT:</td>
+					<td colspan="2" style="text-align: right; font-weight: bold;">{{manageAmountFormat($data->items->sum('vat_amount') ?? 0.00)}}</td>
 				</tr>
                 <tr >
-                    <td colspan="1">Received By: </td>
-					<td colspan="1">Sign: </td>
-					<td colspan="2">TONNAGE : {{manageAmountFormat($TONNAGE)}}</td>
-					<td colspan="1" style="text-align: center;">
-                        <hr style="border: 1px dashed #7b7b7b;">
-                    </td>
+					<td colspan="3" style="text-align: left; font-weight: bold;">TOTAL:</td>
+					<td colspan="2" style="text-align: right; font-weight: bold;">{{manageAmountFormat($gross_amount)}}</td>
 				</tr>
                 <tr >
+					<td colspan="5"><hr style="border: 1px solid #000; margin: 5px 0;"></td>
+				</tr>
+                <tr >
+					<td colspan="2" style="font-weight: bold;">TONNAGE : {{manageAmountFormat($TONNAGE)}}</td>
 					<td colspan="1"></td>
-					<td colspan="1">RUBBER STAMP</td>
-					<td colspan="1"></td>
-					<td colspan="1" style="text-align: right;" >Total:  </td>
-					<td colspan="1">
+					<td colspan="1" style="text-align: right; font-weight: bold;" >Total:  </td>
+					<td colspan="1" style="font-weight: bold;">
                         {{manageAmountFormat($gross_amount)}}
                         <hr style="border: 1px dashed #979797;">
                     </td>
 				</tr>
                 <tr >
-					<td colspan="3">Amount in Words
+					<td colspan="3" style="font-weight: bold;">Amount in Words
                         <br>
                         {{strtoupper(getCurrencyInWords($gross_amount))}}
                     </td>
-					<td colspan="1">A/C Balance : 0.00</td>
-					<td colspan="1">Change: {{$data->change}}</td>
+					<td colspan="1"></td>
+					<td colspan="1" style="font-weight: bold;">Change: {{$data->change}}</td>
 				</tr>
                 <tr >
                     <td colspan="5"></td>
