@@ -18,6 +18,7 @@ use App\SalesmanShift;
 use App\Model\WaNumerSeriesCode;
 use App\Jobs\PerformPostSaleActions;
 use App\Jobs\PrepareStoreParkingList;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Jobs\CreateDeliverySchedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -333,7 +334,8 @@ class SalesmanOrderController extends Controller
     {
         $user = Auth::user();
         
-        if (!$this->isSalesman($user)) {
+        // Allow access for admin users and salesmen
+        if (!($user->role_id == 1 || $this->isSalesman($user))) {
             Session::flash('error', 'Access denied.');
             return redirect()->back();
         }
@@ -346,13 +348,58 @@ class SalesmanOrderController extends Controller
                 'shift',
                 'route'
             ])
-            ->where('user_id', $user->id)
             ->findOrFail($id);
+
+        // Increment print count for reprint tracking
+        $list->increment('print_count');
 
         // Get all settings for the print template
         $all_settings = getAllSettings();
 
         return view('admin.salesman_orders.print', compact('list', 'all_settings'));
+    }
+
+    /**
+     * Download order invoice as PDF
+     */
+    public function downloadInvoice($id)
+    {
+        $user = Auth::user();
+        
+        // Allow access for admin users and salesmen
+        if (!($user->role_id == 1 || $this->isSalesman($user))) {
+            Session::flash('error', 'Access denied.');
+            return redirect()->back();
+        }
+
+        $list = WaInternalRequisition::with([
+                'getRouteCustomer', 
+                'getRelatedItem.getInventoryItemDetail.pack_size',
+                'getRelatedItem.getInventoryItemDetail.taxManager',
+                'getrelatedEmployee',
+                'shift',
+                'route'
+            ])
+            ->findOrFail($id);
+
+        // Increment print count for reprint tracking
+        $list->increment('print_count');
+
+        // Get all settings for the print template
+        $all_settings = getAllSettings();
+        
+        // Set flag to indicate this is for PDF generation
+        $is_pdf = true;
+
+        // Generate PDF
+        $pdf = Pdf::loadView('admin.salesman_orders.print', compact('list', 'all_settings', 'is_pdf'))
+            ->setPaper('A4', 'portrait');
+        
+        // Generate filename
+        $filename = 'Sales_Order_' . $list->requisition_no . '_' . date('Y-m-d') . '.pdf';
+        
+        // Download the PDF
+        return $pdf->download($filename);
     }
 
     /**

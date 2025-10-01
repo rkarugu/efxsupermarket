@@ -1,5 +1,5 @@
 <html>
-<title>Print Order</title>
+<title>Print</title>
 
 <head>
     <style type="text/css">
@@ -52,6 +52,20 @@
 </head>
 <body>
 
+<?php 
+$all_settings = getAllSettings();
+$getLoggeduserProfile = getLoggeduserProfile();
+
+// Custom formatting function for quantities and prices
+function formatNumber($number) {
+    // If the number has a decimal part of .5, show 1 decimal place
+    if (fmod($number, 1) == 0.5) {
+        return number_format($number, 1);
+    }
+    // Otherwise, show no decimal places
+    return number_format($number, 0);
+}
+?>
 <div class="invoice-box">
     <table style="width: 100%;">
         <!-- Company Name & Address (centered) -->
@@ -76,6 +90,13 @@
             </td>
         </tr>
         
+        @if ($list->print_count > 1)
+        <tr>
+            <td colspan="4" class="center">
+                <b>REPRINT {{ $list->print_count - 1 }}</b>
+            </td>
+        </tr>
+        @endif
         
         <!-- Horizontal Line -->
         <tr>
@@ -112,13 +133,16 @@
         <!-- Table Headers -->
         <tr style="border-bottom: 2px solid #000;">
             <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Item</b></td>
+            <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Unit</b></td>
             <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Qty</b></td>
             <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Price</b></td>
             <td style="font-weight: bold; text-align: right; padding: 8px;"><b>Amount</b></td>
         </tr>
         @php
+            $TONNAGE = 0;
             $gross_amount = 0;
             $totalDiscount = 0;
+            $netAmount = 0;
             $totalVat = 0;
             $totalItems = count($list->getRelatedItem);
         @endphp
@@ -127,41 +151,48 @@
             <!-- Item Row -->
             <tr>
                 <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>{{$index + 1}} {{strtoupper($item->getInventoryItemDetail->title)}}</b><br>
+                    <b>{{$index + 1}}. {{strtoupper($item->getInventoryItemDetail->title)}}</b>
+                </td>
+                <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
                     <b>{{$item->getInventoryItemDetail->pack_size->title ?? 'Pc(s)'}}</b>
                 </td>
                 <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>{{number_format($item->quantity, 2)}}</b>
+                    <b>{{formatNumber($item->quantity)}}</b>
                 </td>
                 <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>x {{number_format($item->unit_cost, 2)}}</b>
+                    <b>x {{formatNumber($item->selling_price)}}</b>
                 </td>
                 <td style="font-weight: bold; text-align: right; padding: 8px; vertical-align: top;">
-                    <b>{{number_format($item->total_cost_with_vat, 2)}}</b>
+                    <b>{{formatNumber($item->total_cost_with_vat)}}</b>
                 </td>
             </tr>
             
             @if($index < $totalItems - 1)
             <!-- Horizontal Line between items -->
             <tr>
-                <td colspan="4" style="padding: 0;"><hr style="border: 1px solid #000; margin: 5px 0;"></td>
+                <td colspan="5" style="padding: 0;"><hr style="border: 1px solid #000; margin: 5px 0;"></td>
             </tr>
             @endif
 
             @php
                 $gross_amount += $item->total_cost_with_vat;
+                $TONNAGE += (($item->getInventoryItemDetail->net_weight ?? 0) * $item->quantity);
                 $totalDiscount += $item->discount ?? 0;
 
-                // Calculate VAT
+                // Calculate VAT properly - VAT is already included in selling price, so extract it
                 $vat = 0;
                 if ($item->getInventoryItemDetail->taxManager && $item->getInventoryItemDetail->taxManager->tax_value > 0) {
-                    $taxRate = $item->getInventoryItemDetail->taxManager->tax_value;
+                    $taxRate = (float)$item->getInventoryItemDetail->taxManager->tax_value;
                     if ($item->getInventoryItemDetail->taxManager->tax_format === 'PERCENTAGE') {
-                        $itemSubtotal = $item->quantity * $item->unit_cost - ($item->discount ?? 0);
-                        $vat = ($itemSubtotal * $taxRate) / 100;
+                        // Calculate item total (selling price * quantity - discount)
+                        $itemTotal = ($item->selling_price * $item->quantity) - ($item->discount ?? 0);
+                        // VAT is already included in selling price, so extract it using the formula: VAT = (taxRate / (100 + taxRate)) * itemTotal
+                        $vat = ($taxRate / (100 + $taxRate)) * $itemTotal;
                     }
                 }
-                $totalVat += $vat;
+                // Use stored VAT amount if available, otherwise use calculated
+                $actualVat = $item->vat_amount ?? $vat;
+                $totalVat += $actualVat;
             @endphp
         @endforeach
     </table>
@@ -183,7 +214,7 @@
             <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($totalVat, 2)}}</b></td>
         </tr>
         <tr> 
-            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>TOTAL ORDER AMOUNT:</b></td>
+            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>TOTAL ORDER AMNT:</b></td>
             <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($gross_amount, 2)}}</b></td>
         </tr>
         <tr> 
@@ -233,20 +264,22 @@
                     <b>STATUS: {{strtoupper($list->status)}}</b>
                 </td>
             </tr>
+            <tr>
+                <td colspan="2" style="text-align: center; font-weight: bold; padding: 10px;">
+                    <b>MPESA TILL NO: 166538 NO CASH PAYMENT ON DELIVERY!</b>
+                </td>
+            </tr>
         </table>
     </div>
 
-    <!-- Footer -->
-    <div style="text-align: center; margin-top: 30px; font-size: 10px;">
-        <p><b>Thank you for your business!</b></p>
-        <p>This is a computer generated document.</p>
-    </div>
 
 </div>
 
+@if(!isset($is_pdf))
 <script type="text/javascript">
     window.print();
 </script>
+@endif
 
 </body>
 </html>

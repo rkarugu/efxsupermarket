@@ -19,6 +19,9 @@
                 <a href="{{ route('salesman-orders.print', $order->id) }}" class="btn btn-info btn-sm" target="_blank">
                     <i class="fa fa-print"></i> Print Order
                 </a>
+                <a href="{{ route('salesman-orders.download', $order->id) }}" class="btn btn-success btn-sm">
+                    <i class="fa fa-download"></i> Download Invoice
+                </a>
             </div>
         </div>
 

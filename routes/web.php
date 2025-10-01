@@ -3425,6 +3425,7 @@ Route::group(['prefix' => 'admin', 'middleware' => ['AdminLoggedIn', 'ip-blocker
         Route::post('/shift/close', [SalesmanOrderController::class, 'closeShift'])->name('shift.close');
         Route::get('/{id}', [SalesmanOrderController::class, 'show'])->name('show');
         Route::get('/{id}/print', [SalesmanOrderController::class, 'printOrder'])->name('print');
+        Route::get('/{id}/download', [SalesmanOrderController::class, 'downloadInvoice'])->name('download');
     });
 
 

@@ -164,8 +164,14 @@
                                 </span>
                             </td>
                             <td>
-                                <a href="{{ route('salesman-orders.show', $order->id) }}" class="btn btn-sm btn-info">
-                                    <i class="fa fa-eye"></i> View
+                                <a href="{{ route('salesman-orders.show', $order->id) }}" class="btn btn-sm btn-info" title="View Details">
+                                    <i class="fa fa-eye"></i>
+                                </a>
+                                <a href="{{ route('salesman-orders.print', $order->id) }}" class="btn btn-sm btn-primary" target="_blank" title="Print Order">
+                                    <i class="fa fa-print"></i>
+                                </a>
+                                <a href="{{ route('salesman-orders.download', $order->id) }}" class="btn btn-sm btn-success" title="Download Invoice">
+                                    <i class="fa fa-download"></i>
                                 </a>
                             </td>
                         </tr>
