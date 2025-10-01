@@ -716,7 +716,7 @@ class PosCashSalesController extends Controller
                 } else {
                     $message = 'Sales Saved successfully.';
                     $requestty = 'save';
-                    $location = route('pos-cash-sales.invoice_print', base64_encode($check->id));
+                    $location = route('pos-cash-sales.index'); // Redirect to index instead of print
                 }
                 return response()->json([
                     'result' => 1,

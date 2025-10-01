@@ -277,17 +277,26 @@
                 if (out.result === 1) {
                     form.successMessage(out.message);
                     if (out.location) {
-                        console.log('Print URL:', out.location);
-                        var printWindow = window.open(out.location, 'PrintWindow', 'width=900,height=650');
-                        printWindow.focus();
-                        printWindow.onload = function() {
-                            printWindow.print();
-                            printWindow.onafterprint = function() {
-                                printWindow.close();
-                                location.href = '{{ route($model.'.index') }}';
+                        // Only auto-print for "send_request" (process), not for "save"
+                        if (out.requestty === 'send_request') {
+                            console.log('Print URL:', out.location);
+                            var printWindow = window.open(out.location, 'PrintWindow', 'width=900,height=650');
+                            printWindow.focus();
+                            printWindow.onload = function() {
+                                printWindow.print();
+                                printWindow.onafterprint = function() {
+                                    printWindow.close();
+                                    location.href = '{{ route($model.'.index') }}';
+                                };
                             };
-                        };
-                        return;
+                            return;
+                        } else {
+                            // For "save" action, just redirect without printing
+                            setTimeout(() => {
+                                location.href = out.location;
+                            }, 1000);
+                            return;
+                        }
                     }
                     sales_id = out.sales_id
                     connectToPusher()
