@@ -1872,10 +1872,10 @@ Route::any('/admin/pos/route-customer/store', [CustomerController::class, 'store
 
     Route::resource('vehicletype', 'VehicleTypeController');
     Route::resource('make', 'MakeController');
-    Route::resource('model', 'ModelController');
+    // Route::resource('model', 'ModelController'); // Commented out - ModelController does not exist
     Route::resource('bodytype', 'BodyTypeController');
     Route::resource('expensetype', 'ExpenseTypeController');
-    Route::resource('vehicleassignment', 'VehicleAssignmentController');
+    // Route::resource('vehicleassignment', 'VehicleAssignmentController'); // Commented out - VehicleAssignmentController does not exist
 
     Route::resource('tyre_fitting', 'TyreFittingController');
     Route::any('tyre_fitting/search', 'TyreFittingController@tyre_search')->name('tyre_fitting.search');
@@ -1890,10 +1890,10 @@ Route::any('/admin/pos/route-customer/store', [CustomerController::class, 'store
 
     Route::resource('fuelentry', 'FuelEntryController');
     Route::resource('expensehistory', 'ExpenseHistoryController');
-    Route::resource('meterhistory', 'MeterHistoryController');
+    // Route::resource('meterhistory', 'MeterHistoryController'); // Commented out - MeterHistoryController does not exist
     Route::resource('issues', 'IssuesController');
 
-    Route::any('odometer_reading_history/{id}', 'MeterHistoryController@odometer_reading_history')->name('meterhistory.odometer_reading_history');
+    // Route::any('odometer_reading_history/{id}', 'MeterHistoryController@odometer_reading_history')->name('meterhistory.odometer_reading_history'); // Commented out - MeterHistoryController does not exist
 
     Route::GET('servicehistory/issues', 'ServiceHistoryController@getissues')->name('servicehistory.issues');
     Route::GET('servicehistory/servicetask', 'ServiceHistoryController@Addtask')->name('servicehistory.servicetask');
@@ -1945,7 +1945,7 @@ Route::any('/admin/pos/route-customer/store', [CustomerController::class, 'store
     Route::GET('vehicle-lists', 'ExpenseHistoryController@vehicle_list')->name('vehicle.lists');
     Route::GET('vendor-lists', 'ExpenseHistoryController@WaSupplier')->name('vendor.lists');
 
-    Route::GET('vehicle-type', 'MeterHistoryController@vehicle_list')->name('vehicle.types');
+    // Route::GET('vehicle-type', 'MeterHistoryController@vehicle_list')->name('vehicle.types'); // Commented out - MeterHistoryController does not exist
 
     Route::GET('vehicle-lists', 'IssuesController@vehicle_list')->name('vehicle.lists');
     Route::GET('user-list', 'IssuesController@User')->name('user.list');
@@ -1965,9 +1965,9 @@ Route::any('/admin/pos/route-customer/store', [CustomerController::class, 'store
 
     Route::get('stock-takes/getCategories', 'ServiceHistoryController@getCategories')->name('admin.servicehistory.create');
     // Route::get('vehicle-listing/sheet', 'VehicleListingController@index')->name('vehicle-listing.index');
-    Route::resource('vehiclelisting', 'VehicleListingController');
-    Route::get('exportpdflisting/', 'VehicleListingController@createPDF')->name('exportpdflisting');
-    Route::get('/pdf', 'VehicleListingController@pdfview');
+    // Route::resource('vehiclelisting', 'VehicleListingController'); // Commented out - VehicleListingController does not exist
+    // Route::get('exportpdflisting/', 'VehicleListingController@createPDF')->name('exportpdflisting'); // Commented out - VehicleListingController does not exist
+    // Route::get('/pdf', 'VehicleListingController@pdfview'); // Commented out - VehicleListingController does not exist
 
     Route::resource('operatingcostsummary', 'OperatingCostController');
     Route::get('exportpdfoperatingassigemet/', 'OperatingCostController@createPDF')->name('exportpdfoperatingassigemet');
@@ -3424,6 +3424,7 @@ Route::group(['prefix' => 'admin', 'middleware' => ['AdminLoggedIn', 'ip-blocker
         Route::post('/shift/open', [SalesmanOrderController::class, 'openShift'])->name('shift.open');
         Route::post('/shift/close', [SalesmanOrderController::class, 'closeShift'])->name('shift.close');
         Route::get('/{id}', [SalesmanOrderController::class, 'show'])->name('show');
+        Route::get('/{id}/print', [SalesmanOrderController::class, 'printOrder'])->name('print');
     });
 
 

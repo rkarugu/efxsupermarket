@@ -327,6 +327,35 @@ class SalesmanOrderController extends Controller
     }
 
     /**
+     * Print order invoice
+     */
+    public function printOrder($id)
+    {
+        $user = Auth::user();
+        
+        if (!$this->isSalesman($user)) {
+            Session::flash('error', 'Access denied.');
+            return redirect()->back();
+        }
+
+        $list = WaInternalRequisition::with([
+                'getRouteCustomer', 
+                'getRelatedItem.getInventoryItemDetail.pack_size',
+                'getRelatedItem.getInventoryItemDetail.taxManager',
+                'getrelatedEmployee',
+                'shift',
+                'route'
+            ])
+            ->where('user_id', $user->id)
+            ->findOrFail($id);
+
+        // Get all settings for the print template
+        $all_settings = getAllSettings();
+
+        return view('admin.salesman_orders.print', compact('list', 'all_settings'));
+    }
+
+    /**
      * Get available inventory items for salesman (using stock moves like SalesInvoiceController)
      */
     private function getAvailableInventoryItemsForUser($user)

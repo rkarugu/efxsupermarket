@@ -16,9 +16,9 @@
                 <a href="{{ route('salesman-orders.index') }}" class="btn btn-default btn-sm">
                     <i class="fa fa-arrow-left"></i> Back to Dashboard
                 </a>
-                <button class="btn btn-info btn-sm" onclick="window.print()">
-                    <i class="fa fa-print"></i> Print
-                </button>
+                <a href="{{ route('salesman-orders.print', $order->id) }}" class="btn btn-info btn-sm" target="_blank">
+                    <i class="fa fa-print"></i> Print Order
+                </a>
             </div>
         </div>
 
