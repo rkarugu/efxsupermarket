@@ -142,7 +142,7 @@
                             Customer Name: {{$data->customer}}<br>
                             Date: {{date('d/m/Y H:i',strtotime($data->date . ' ' . $data->time))}}<br>
                             Served By: {{@$data->user->name}}<br>
-                            Telephone No: {{$data->customer_phone ?? ''}}<br>
+                            Telephone No: {{$data->customer_phone_number ?? ''}}<br>
                         </div>
                     </td>
                 </tr>
@@ -170,8 +170,7 @@
             <tbody>
                 <tr class="heading">
 					<td style="width: 5%; font-weight: bold;">No</td>
-					<td style="width: 10%; font-weight: bold;">Code</td>
-					<td style="width: 35%; font-weight: bold;">Description</td>
+					<td style="width: 45%; font-weight: bold;">Description</td>
 					<td style="width: 8%; font-weight: bold;">Qty</td>
 					<td style="width: 10%; font-weight: bold;">Price</td>
 					<td style="width: 12%; font-weight: bold;">Amount</td>
@@ -187,14 +186,13 @@
                 @foreach ($data->items as $index => $item)
                     <tr class="item">
                         <td style="font-weight: bold;">{{$itemNumber}}</td>
-                        <td style="font-weight: bold;">{{@$item->item->stock_id_code}}</td>
                         <td style="font-weight: bold;">{{@$item->item->description}}</td>
                         <td style="font-weight: bold;">{{((int)$item->qty)}}</td>
-                        <td style="font-weight: bold;">{{manageAmountFormat($item->selling_price)}}</td>
-                        <td style="font-weight: bold;">{{manageAmountFormat($item->qty*$item->selling_price)}}</td>
-                        <td style="font-weight: bold;">{{manageAmountFormat($item->discount_amount)}}</td>
-                        <td style="font-weight: bold;">{{$item->vat_percentage}}</td>
-                        <td style="font-weight: bold;">{{manageAmountFormat($item->qty*$item->selling_price)}}</td>
+                        <td style="font-weight: bold;">{{number_format($item->selling_price, 0)}}</td>
+                        <td style="font-weight: bold;">{{number_format($item->qty*$item->selling_price, 0)}}</td>
+                        <td style="font-weight: bold;">{{number_format($item->discount_amount, 0)}}</td>
+                        <td style="font-weight: bold;">{{number_format($item->vat_percentage, 0)}}</td>
+                        <td style="font-weight: bold;">{{number_format($item->qty*$item->selling_price, 0)}}</td>
                     </tr>
                     
                     @if($index < $totalItems - 1)

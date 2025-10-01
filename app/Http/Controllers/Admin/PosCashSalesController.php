@@ -22,14 +22,12 @@ use App\Models\HamperItem;
 use App\Models\PromotionType;
 use App\Models\ReturnReason;
 use App\Models\WaAccountTransaction;
-use App\Models\WaBranch;
-
 use App\Services\InfoSkySmsService;
 use App\Services\PosCashSaleService;
 use App\Services\PosPaymentService;
 use App\Services\SupplierIncentiveCalculator;
-use App\User;
-use App\WaTenderEntry;
+use App\Jobs\PerformPostSaleActions;
+use App\Jobs\PrepareStoreParkingList;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -48,6 +46,7 @@ use App\Model\WaPosCashSalesPayments;
 use App\Model\WaEsdDetails;
 use App\Model\DispatchLoadedProducts;
 use App\Model\Restaurant;
+use App\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -2124,6 +2123,257 @@ class PosCashSalesController extends Controller
         } else {
             Session::flash('warning', 'Invalid Request');
             return redirect()->back();
+        }
+    }
+
+    /**
+     * Show return items form
+     */
+    public function return_items($id)
+    {
+        $user = getLoggeduserProfile();
+        $id = base64_decode($id);
+        $permission = $this->mypermissionsforAModule();
+        $pmodule = $this->pmodule;
+        $title = $this->title;
+        $model = $this->model;
+        
+        if (isset($permission[$pmodule . '___return']) || $permission == 'superadmin') {
+            $breadcum = [$title => route($model . '.index'), 'Return Items' => ''];
+            $data = WaPosCashSales::with([
+                'items' => function($e) use ($permission, $user) {
+                    $e->where('is_return', 0)->where(function($w) use ($permission, $user) {
+                        if ($permission != 'superadmin') {
+                            $w->where('store_location_id', $user->wa_location_and_store_id);
+                        }
+                    });
+                },
+                'user',
+                'items.item',
+                'items.item.pack_size',
+                'items.location',
+                'items.dispatch_by'
+            ])
+            ->whereHas('items', function($e) use ($permission, $user) {
+                $e->where('is_return', 0)->where(function($w) use ($permission, $user) {
+                    if ($permission != 'superadmin') {
+                        $w->where('store_location_id', $user->wa_location_and_store_id);
+                    }
+                });
+            })
+            ->where('status', 'Completed')
+            ->where('id', $id)
+            ->first();
+            
+            if (!$data) {
+                Session::flash('warning', 'No Items for return available');
+                return redirect()->back();
+            }
+            
+            // Get return reasons for the dropdown
+            $reasons = ReturnReason::where('use_for_pos', 1)->get();
+            
+            // Calculate totals for the view
+            $totalprice = $data->items->sum(function($item) {
+                return $item->qty * $item->selling_price;
+            });
+            $discount = $data->items->sum('discount_amount');
+            $totalvat = $data->items->sum('vat_amount');
+            $total = $totalprice - $discount;
+            
+            return view('admin.pos_cash_sales.return_items', compact('data', 'title', 'model', 'breadcum', 'pmodule', 'permission', 'reasons', 'totalprice', 'discount', 'totalvat', 'total'));
+        } else {
+            Session::flash('warning', 'Invalid Request');
+            return redirect()->back();
+        }
+    }
+
+    /**
+     * Process return items
+     */
+    public function return_items_post($id, Request $request)
+    {
+        if (!$request->ajax()) {
+            Session::flash('warning', 'Invalid Request');
+            return redirect()->back();
+        }
+        
+        $permission = $this->mypermissionsforAModule();
+        $pmodule = $this->pmodule;
+        
+        if (!isset($permission[$pmodule . '___return']) && $permission != 'superadmin') {
+            return response()->json([
+                'result' => -1,
+                'message' => 'Restricted: You dont have permissions'
+            ]);
+        }
+        
+        $validation = \Validator::make($request->all(), [
+            'item' => 'array',
+            'item.*' => 'required|exists:wa_pos_cash_sales_items,id',
+            'quantity.*' => 'required|min:1',
+            'id' => 'required|exists:wa_pos_cash_sales,id',
+        ], [], [
+            'item.*' => 'Item',
+        ]);
+        
+        if ($validation->fails()) {
+            return response()->json([
+                'result' => 0,
+                'errors' => $validation->errors()
+            ]);
+        }
+        
+        if (count($request->quantity) == 0) {
+            return response()->json([
+                'result' => 0,
+                'errors' => ['item' => ['Items are needed to process return']]
+            ]);
+        }
+        
+        foreach ($request->quantity as $tt => $vv) {
+            if ($vv <= 0) {
+                return response()->json([
+                    'result' => 0,
+                    'errors' => ['item.' . $tt => ['Quantity needs to be greater than 0']]
+                ]);
+            }
+        }
+        
+        // Process the actual return
+        $id = base64_decode($id);
+        $user = getLoggeduserProfile();
+        
+        // Get the POS sale with items
+        $pos = WaPosCashSales::with([
+            'items' => function($e) use ($permission, $user, $request) {
+                $e->whereIn('id', $request->item)->where('is_return', 0)->where(function($w) use ($permission, $user) {
+                    if ($permission != 'superadmin') {
+                        $w->where('store_location_id', $user->wa_location_and_store_id);
+                    }
+                });
+            },
+            'user',
+            'items.item'
+        ])
+        ->whereHas('items', function($e) use ($permission, $user, $request) {
+            $e->whereIn('id', $request->item)->where('is_return', 0)->where(function($w) use ($permission, $user) {
+                if ($permission != 'superadmin') {
+                    $w->where('store_location_id', $user->wa_location_and_store_id);
+                }
+            });
+        })
+        ->where('status', 'Completed')
+        ->where('id', $id)
+        ->first();
+        
+        if (!$pos) {
+            return response()->json([
+                'result' => 0,
+                'errors' => ['receipt_no' => ['Receipt Not found']]
+            ]);
+        }
+        
+        if ($pos->items->count() == 0) {
+            return response()->json([
+                'result' => 0,
+                'errors' => ['receipt_no' => ['No Items Available']]
+            ]);
+        }
+        
+        // Validate quantities don't exceed available
+        foreach ($pos->items as $item) {
+            if (@$request->quantity[$item->id] > $item->qty) {
+                return response()->json([
+                    'result' => 0,
+                    'errors' => ['item.' . $item->id => ['Quantity cannot be greater than ' . $item->qty]]
+                ]);
+            }
+        }
+        
+        try {
+            DB::beginTransaction();
+            
+            // Generate return GRN number
+            $sale_invoiceno = getCodeWithNumberSeries('RETURN');
+            updateUniqueNumberSeries('RETURN', $sale_invoiceno);
+            
+            $dateTime = date('Y-m-d H:i:s');
+            $returns = [];
+            
+            foreach ($pos->items as $value) {
+                $return_quantity = @$request->quantity[$value->id];
+                $reason_id = @$request->reason[$value->id];
+                
+                if ($return_quantity > 0) {
+                    // Calculate new quantity after return
+                    $newqty = ($value->qty - $return_quantity);
+                    
+                    // Update the original item
+                    WaPosCashSalesItems::where('id', $value->id)->update([
+                        'return_by' => $user->id,
+                        'is_return' => 1,
+                        'return_grn' => $sale_invoiceno,
+                        'return_date' => $dateTime,
+                        'original_quantity' => $value->qty,
+                        'return_quantity' => $return_quantity,
+                        'qty' => $newqty,
+                        'total' => (($newqty * $value->selling_price) - (($newqty > 0) ? $value->discount_amount : 0))
+                    ]);
+                    
+                    // Create return record
+                    $returns[] = [
+                        'wa_pos_cash_sales_item_id' => $value->id,
+                        'wa_pos_cash_sales_id' => $pos->id,
+                        'return_by' => $user->id,
+                        'return_grn' => $sale_invoiceno,
+                        'return_quantity' => $return_quantity,
+                        'reason_id' => $reason_id,
+                        'return_date' => $dateTime,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ];
+                    
+                    // Create stock movement (return stock back to inventory)
+                    WaStockMove::create([
+                        'wa_inventory_item_id' => $value->wa_inventory_item_id,
+                        'wa_location_and_store_id' => $value->store_location_id,
+                        'qauntity' => $return_quantity, // Positive quantity (returning to stock)
+                        'document_no' => $sale_invoiceno,
+                        'refrence' => 'POS RETURN - ' . $sale_invoiceno,
+                        'user_id' => $user->id,
+                        'stock_id_code' => $value->item->stock_id_code,
+                        'price' => $value->selling_price,
+                        'selling_price' => $value->selling_price,
+                        'standard_cost' => $value->item->standard_cost ?? 0,
+                        'total_cost' => $value->selling_price * $return_quantity,
+                        'created_at' => $dateTime,
+                        'updated_at' => $dateTime,
+                    ]);
+                }
+            }
+            
+            // Insert return records
+            if (!empty($returns)) {
+                WaPosCashSalesItemReturns::insert($returns);
+            }
+            
+            DB::commit();
+            
+            return response()->json([
+                'result' => 1,
+                'message' => 'Return processed successfully. Return GRN: ' . $sale_invoiceno,
+                'location' => route('pos-cash-sales.index')
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollback();
+            \Log::error('Return processing error: ' . $e->getMessage());
+            
+            return response()->json([
+                'result' => -1,
+                'message' => 'Error processing return: ' . $e->getMessage()
+            ]);
         }
     }
 }
