@@ -3412,6 +3412,8 @@ Route::group(['prefix' => 'admin', 'middleware' => ['AdminLoggedIn', 'ip-blocker
         Route::get('/ajax/item-details', [SalesmanOrderController::class, 'getItemDetails'])->name('ajax.item-details');
         Route::get('/search-inventory', [SalesmanOrderController::class, 'searchInventory'])->name('search-inventory');
         Route::get('/get-item-details', [SalesmanOrderController::class, 'getItemDetails'])->name('get-item-details');
+        Route::get('/calculate-discount', [SalesmanOrderController::class, 'calculateItemDiscount'])->name('calculate-discount');
+        Route::get('/test-discount/{itemId}/{quantity}', [SalesmanOrderController::class, 'testDiscount'])->name('test-discount');
         Route::get('/test-search', [SalesmanOrderController::class, 'testSearch'])->name('test-search');
         Route::get('/debug-tax/{orderId}', [SalesmanOrderController::class, 'debugTax'])->name('debug-tax');
         Route::get('/fix-vat/{orderId}', [SalesmanOrderController::class, 'fixVatForOrder'])->name('fix-vat');

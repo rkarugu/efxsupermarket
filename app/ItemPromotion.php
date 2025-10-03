@@ -7,6 +7,7 @@ use App\Models\PromotionType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Model\WaInventoryItem;
+use App\Model\User;
 
 
 class ItemPromotion extends Model

@@ -47,7 +47,7 @@
         <!-- Company Name & Address (centered) -->
         <tr>
             <td colspan="4" class="center">
-                <b style="font-size: 18px;">{!! strtoupper($all_settings['COMPANY_NAME']) !!}</b>
+                <b style="font-size: 18px;">*** TEMPLATE UPDATED *** {!! strtoupper($all_settings['COMPANY_NAME']) !!}</b>
             </td>
         </tr>
         <tr>
@@ -112,6 +112,7 @@
         
         <?php 
         $total_amount = [];
+        $discount_amount = [];
         $qty = [];
         $totalItems = count($itemsdata ?? []);
         ?>
@@ -127,10 +128,10 @@
                 <b>{{number_format($item->quantity ?? 1, 2)}}</b>
             </td>
             <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                <b>x {{number_format($item->getInventoryItemDetail->selling_price ?? 2000, 2)}}</b>
+                <b>x {{number_format($item->selling_price ?? 2000, 2)}}</b>
             </td>
             <td style="font-weight: bold; text-align: right; padding: 8px; vertical-align: top;">
-                <b>{{number_format(($item->quantity ?? 1) * ($item->getInventoryItemDetail->selling_price ?? 2000), 2)}}</b>
+                <b>{{number_format(($item->quantity ?? 1) * ($item->selling_price ?? 2000), 2)}}</b>
             </td>
         </tr>
         
@@ -142,7 +143,11 @@
         @endif
         
         <?php 
-        $total_amount[] = ($item->quantity ?? 1) * ($item->getInventoryItemDetail->selling_price ?? 2000);
+        $original_amount = ($item->quantity ?? 1) * ($item->selling_price ?? 2000);
+        $discount_per_item = ($item->discount ?? 0) * ($item->quantity ?? 1);
+        
+        $total_amount[] = $original_amount;
+        $discount_amount[] = $discount_per_item;
         $qty[] = $item->quantity ?? 1;
         ?>
         @endforeach
@@ -157,20 +162,24 @@
             <td style="text-align: right; font-weight: bold; padding: 8px; width: 30%;"><b>{{count($itemsdata ?? [])}}</b></td>
         </tr>
         <tr> 
-            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>Subtotal:</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(array_sum($total_amount) * 0.84, 2)}}</b></td>
+            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>Subtotal: [TEMPLATE UPDATED]</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(array_sum($total_amount), 2)}}</b></td>
+        </tr>
+        <tr> 
+            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>Disc</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(array_sum($discount_amount ?? []), 2)}} (Debug: {{json_encode($discount_amount ?? [])}})</b></td>
         </tr>
         <tr> 
             <td style="text-align: left; font-weight: bold; padding: 8px;"><b>VAT</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(array_sum($total_amount) * 0.16, 2)}}</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(0, 2)}}</b></td>
         </tr>
         <tr> 
             <td style="text-align: left; font-weight: bold; padding: 8px;"><b>TOTAL INVOICE AMNT:</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(array_sum($total_amount), 2)}}</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(array_sum($total_amount) - array_sum($discount_amount), 2)}}</b></td>
         </tr>
         <tr> 
             <td style="text-align: left; font-weight: bold; padding: 8px;"><b>CURBET DUE AMOUNT</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(array_sum($total_amount), 2)}}</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(array_sum($total_amount) - array_sum($discount_amount), 2)}}</b></td>
         </tr>
         <tr> 
             <td style="text-align: left; font-weight: bold; padding: 8px;"><b>ACCOUNT BALANCE</b></td>

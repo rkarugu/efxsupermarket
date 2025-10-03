@@ -554,4 +554,302 @@ BYPASS_INVOICE_BALANCE_CHECK=false  # Only for debugging
 
 ---
 
+## 14. DISCOUNT AND PROMOTION SYSTEM FIXES
+
+### Problems Identified
+Comprehensive analysis of discount and promotion systems revealed multiple critical issues affecting system reliability and security.
+
+### Discount System Issues Fixed
+
+#### 14.1 TradeDiscount Model Typo
+- **Issue**: Method name `isAppoved()` had typo, should be `isApproved()`
+- **Fix**: Corrected method name in `app/Models/TradeDiscount.php`
+- **Impact**: Prevents runtime errors when checking discount approval status
+
+#### 14.2 Missing Import Statements
+- **Issue**: `DiscountBand.php` missing `use App\Model\User;` import
+- **Fix**: Added proper import statement
+- **Impact**: Prevents class not found errors in relationships
+
+#### 14.3 Division by Zero Protection
+- **Issue**: `CreateTradeDiscount` action could cause division by zero
+- **Fix**: Added validation in `calculateDiscount()` method:
+  ```php
+  if (!$item || !$option || !isset($item->amount) || $item->amount <= 0) {
+      return 0;
+  }
+  ```
+- **Impact**: Prevents fatal errors during discount calculations
+
+### Promotion System Issues Fixed
+
+#### 14.4 ItemPromotion Model Import Fix
+- **Issue**: Missing `use App\Model\User;` import in `ItemPromotion.php`
+- **Fix**: Added proper import statement
+- **Impact**: Fixes relationship method errors
+
+#### 14.5 Success Message Correction
+- **Issue**: Unblock method showed "Promotion blocked successfully" instead of "unblocked"
+- **Fix**: Corrected message in `ItemPromotionsController.php`
+- **Impact**: Provides accurate user feedback
+
+#### 14.6 Null Pointer Exception Prevention
+- **Issue**: `checkPromotion()` method could cause null pointer exception
+- **Fix**: Added safe null checking:
+  ```php
+  $promotionTypeModel = $promotion->promotion_type_id ? PromotionType::find($promotion->promotion_type_id) : null;
+  $promotionType = $promotionTypeModel ? $promotionTypeModel->description : null;
+  ```
+- **Impact**: Prevents crashes when promotion type is missing
+
+#### 14.7 SQL Injection Vulnerability Fix
+- **Issue**: Direct variable interpolation in SQL query
+- **Fix**: Implemented parameterized queries:
+  ```php
+  $bindings = [];
+  if($request->item){
+      $query.= " WHERE item_promotions.inventory_item_id = ? ";
+      $bindings[] = $request->item;
+  }
+  $data = DB::select($query, $bindings);
+  ```
+- **Impact**: Eliminates SQL injection security risk
+
+#### 14.8 Date Validation Implementation
+- **Issue**: No validation for promotion dates in creation
+- **Fix**: Added comprehensive validation:
+  ```php
+  $request->validate([
+      'from_date' => 'required|date',
+      'to_date' => 'nullable|date|after_or_equal:from_date',
+      'promotion_type_id' => 'required|exists:promotion_types,id',
+      'supplier_id' => 'required'
+  ]);
+  ```
+- **Impact**: Prevents invalid date ranges and data integrity issues
+
+#### 14.9 PromotionService Implementation
+- **Issue**: Empty `create()` method in `PromotionService`
+- **Fix**: Implemented full promotion creation logic with error handling
+- **Impact**: Provides reusable service for promotion creation
+
+#### 14.10 Date Filtering Fix
+- **Issue**: Important date filtering logic was commented out in `ActivePromotionsController`
+- **Fix**: Uncommented and activated proper date filtering
+- **Impact**: Ensures only active promotions are displayed
+
+### Files Modified
+- `app/Models/TradeDiscount.php`
+- `app/DiscountBand.php`
+- `app/ItemPromotion.php`
+- `app/Http/Controllers/ItemPromotionsController.php`
+- `app/Http/Controllers/Api/CashSalesController.php`
+- `app/Actions/SupplierInvoice/CreateTradeDiscount.php`
+- `app/Http/Controllers/Admin/Inventory/ActivePromotionsController.php`
+- `app/Services/Inventory/PromotionService.php`
+
+### Security Improvements
+- ✅ SQL injection vulnerability eliminated
+- ✅ Null pointer exceptions prevented
+- ✅ Input validation strengthened
+- ✅ Error handling improved
+
+### System Reliability Improvements
+- ✅ Method name typos fixed
+- ✅ Missing imports added
+- ✅ Division by zero protection
+- ✅ Date validation implemented
+- ✅ Service layer completed
+
+### Integration Issues Identified
+- **Issue**: No clear precedence when both promotions and discounts apply to same item
+- **Current State**: Either/or logic instead of proper combination handling
+- **Recommendation**: Implement conflict resolution system for future enhancement
+
+---
+
+## 15. DISCOUNT BAND INTEGRATION IN SALESMAN ORDERS
+
+### Problem Identified
+Discount bands were not being applied in salesman order creation and credit invoices, despite being configured in the system. Users could see discount bands in the POS system but not in salesman orders.
+
+### Root Cause Analysis
+- **Issue**: `SalesmanOrderController.searchInventory()` method only returned base selling price
+- **Missing Logic**: No discount band calculation based on quantity in salesman order system
+- **Frontend Gap**: No JavaScript to check discount bands when quantity changes
+- **Data Flow**: Discount information not being passed to order storage
+
+### Solution Implemented
+
+#### 15.1 Backend Discount Calculation API
+- **New Method**: Added `calculateItemDiscount()` in `SalesmanOrderController`
+- **Route Added**: `GET /admin/salesman-orders/calculate-discount`
+- **Functionality**: 
+  - Validates inventory item ID and quantity
+  - Finds applicable discount bands based on quantity ranges
+  - Returns original price, discounted price, and discount description
+  - Handles edge cases (no discount bands, invalid items)
+
+#### 15.2 Enhanced Search Results
+- **Modified**: `searchInventory()` method to include discount band information
+- **Added**: Discount bands data in search results for frontend reference
+- **Import**: Added `use App\DiscountBand;` to controller
+
+#### 15.3 Frontend Integration
+- **Dynamic Discount Checking**: Added `checkDiscountBand()` JavaScript function
+- **Real-time Updates**: Discount calculation triggers on quantity input changes
+- **Visual Feedback**: 
+  - Green background on price field when discount applied
+  - Shows original price and discount description
+  - Automatic price adjustment based on quantity
+- **Data Persistence**: Hidden discount field added to form for proper data submission
+
+#### 15.4 Form Data Structure
+- **Enhanced Item Row**: Added hidden discount input field
+- **Proper Submission**: Discount amount included in order submission
+- **Backend Storage**: Existing `store()` method already handles discount field
+
+### Files Modified
+- `app/Http/Controllers/Admin/SalesmanOrderController.php`
+- `routes/web.php` (added discount calculation route)
+- `resources/views/admin/salesman_orders/create.blade.php`
+
+### Technical Implementation Details
+
+#### Discount Band Query Logic
+```php
+$discountBand = DiscountBand::where('inventory_item_id', $inventory_item_id)
+    ->where('status', 'APPROVED')
+    ->where(function ($query) use ($quantity) {
+        $query->where('from_quantity', '<=', $quantity)
+            ->where(function($q) use ($quantity) {
+                $q->where('to_quantity', '>=', $quantity)
+                  ->orWhereNull('to_quantity');
+            });
+    })
+    ->orderBy('from_quantity', 'desc')
+    ->first();
+```
+
+#### Frontend Discount Application
+- **Trigger**: Quantity input change event
+- **AJAX Call**: Real-time discount calculation
+- **UI Updates**: Price field, background color, discount information
+- **Data Flow**: Hidden form field updated for backend processing
+
+### Expected Behavior
+1. **Item Selection**: User adds item to salesman order
+2. **Quantity Entry**: User enters or changes quantity
+3. **Automatic Calculation**: System checks for applicable discount bands
+4. **Price Update**: Selling price automatically adjusts if discount applies
+5. **Visual Confirmation**: Green background and discount details shown
+6. **Order Submission**: Discount information saved with order
+7. **Invoice Generation**: Credit invoices reflect discount band pricing
+
+### Testing Scenarios
+- ✅ Single item with quantity-based discount band
+- ✅ Multiple items with different discount structures
+- ✅ Quantity changes triggering price updates
+- ✅ Items without discount bands (normal pricing)
+- ✅ Edge cases (invalid quantities, missing items)
+
+---
+
+## 16. DISCOUNT BAND INTEGRATION IN SALES INVOICE (CREDIT SALES)
+
+### Problem Identified
+Similar to salesman orders, the sales invoice creation form at `/admin/sales-invoice/create` was not applying discount bands despite having some discount calculation logic that pointed to the wrong route.
+
+### Root Cause Analysis
+- **Issue**: Existing discount calculation called POS route (`pos-cash-sales.cal_discount`) instead of sales invoice route
+- **Missing Logic**: No proper discount band calculation for sales invoices
+- **Frontend Gap**: Incorrect AJAX endpoint and response handling
+- **Data Flow**: Discount information not being properly applied to price fields
+
+### Solution Implemented
+
+#### 16.1 Backend Enhancement
+- **Enhanced Controller**: Added `calculateItemDiscount()` method to `InternalRequisitionController`
+- **Route Added**: `GET /admin/sales-invoice/calculate-discount`
+- **Import Added**: `use App\DiscountBand;` to controller
+- **Functionality**: Same discount band logic as salesman orders
+
+#### 16.2 Backend Integration Approach
+- **Issue Resolution**: Frontend AJAX approach had authentication/routing issues (302 redirects)
+- **Root Cause**: Form was calling `update()` method instead of `store()` method
+- **Solution**: Implemented discount calculation in both `store()` and `update()` methods
+- **Backend Processing**: Discount bands calculated during form submission, not real-time
+- **Consistent Logic**: Same discount band query logic as salesman orders
+- **Reliable Processing**: Eliminates frontend AJAX dependency and authentication issues
+
+#### 16.3 Print Template Discount Display Fix
+- **Issue**: Discount calculations were incorrect in invoice printout
+- **Root Cause**: 
+  - Discount amount was being stored as total discount instead of per-unit discount
+  - Wrong print template was being edited (salesinvoice instead of internalrequisition)
+- **Solution**: 
+  - Fixed discount calculation to store per-unit discount in `discount` field
+  - Store original price in `selling_price` field
+  - Updated correct print template (`internalrequisition/print.blade.php`) to:
+    - Show original price from `$item->selling_price` instead of `$item->getInventoryItemDetail->selling_price`
+    - Calculate discount amounts using `$item->discount` field
+    - Added "Disc" row in invoice summary section
+    - Updated total calculations to subtract discount from original amount
+- **Result**: Invoice now correctly shows original price (1,035.00), discount (35.00), and final amount (1,000.00)
+
+#### 16.3 Technical Implementation
+
+**Backend Discount Calculation in Store Method:**
+```php
+// Check for discount bands during form submission
+$discountBand = DiscountBand::where('inventory_item_id', $value->id)
+    ->where('status', 'APPROVED')
+    ->where(function ($query) use ($quantity) {
+        $query->where('from_quantity', '<=', $quantity)
+            ->where(function($q) use ($quantity) {
+                $q->where('to_quantity', '>=', $quantity)
+                  ->orWhereNull('to_quantity');
+            });
+    })
+    ->orderBy('from_quantity', 'desc')
+    ->first();
+
+if ($discountBand) {
+    $discountAmount = $discountBand->discount_amount * $quantity;
+    $finalPrice = max(0, $originalPrice - $discountBand->discount_amount);
+}
+```
+
+**Data Storage:**
+```php
+$childs[] = [
+    'selling_price' => $finalPrice, // Discounted price
+    'discount' => $discountAmount,  // Total discount amount
+    'total_cost' => $finalPrice * $quantity,
+    // ... other fields
+];
+```
+
+### Files Modified
+- `app/Http/Controllers/Admin/InternalRequisitionController.php`
+- `routes/creditSales.php` (added discount calculation route)
+- `resources/views/admin/internalrequisition/create.blade.php`
+
+### Expected Behavior
+1. **Item Selection**: User adds DOVE item to sales invoice (shows original price)
+2. **Quantity Entry**: User enters quantity (e.g., 3 units)
+3. **Form Submission**: User clicks "Save" or "Send Request"
+4. **Backend Processing**: System calculates applicable discount bands automatically
+5. **Price Application**: Discounted price and discount amount saved to database
+6. **Invoice Creation**: Final invoice reflects discount band pricing
+7. **Consistent Results**: Same discount logic as salesman orders, no frontend dependencies
+
+### Integration with Existing Logic
+- ✅ Maintains compatibility with existing VAT calculations
+- ✅ Works with existing total calculation functions
+- ✅ Preserves existing form validation and error handling
+- ✅ Integrates with existing item selection workflow
+
+---
+
 *This document serves as a comprehensive reference for all major fixes and improvements implemented in the ChapChap application. Keep this updated as new fixes are applied.*

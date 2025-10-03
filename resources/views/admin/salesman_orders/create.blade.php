@@ -235,7 +235,19 @@ function setupTableHandlers() {
     
     // Handle quantity and price changes
     document.addEventListener('input', function(e) {
-        if (e.target.classList.contains('quantity') || e.target.classList.contains('selling_price')) {
+        if (e.target.classList.contains('quantity')) {
+            const row = e.target.closest('tr');
+            const itemId = row.querySelector('input[name*="wa_inventory_item_id"]').value;
+            const quantity = parseFloat(e.target.value) || 0;
+            
+            if (quantity > 0) {
+                // Check for discount bands
+                checkDiscountBand(itemId, quantity, row);
+            } else {
+                calculateRowTotal(row);
+                calculateGrandTotal();
+            }
+        } else if (e.target.classList.contains('selling_price')) {
             const row = e.target.closest('tr');
             calculateRowTotal(row);
             calculateGrandTotal();
@@ -489,6 +501,7 @@ function addItemToCart(itemId, itemName, unitName, availableStock, sellingPrice)
     const itemRowHTML = `
         <td>
             <input type="hidden" name="items[${itemId}][wa_inventory_item_id]" value="${itemId}">
+            <input type="hidden" class="discount" name="items[${itemId}][discount]" value="0">
             <strong>${itemName}</strong>
         </td>
         <td>${itemName}</td>
@@ -517,11 +530,23 @@ function addItemToCart(itemId, itemName, unitName, availableStock, sellingPrice)
         searchRow = newRow;
     }
     
-    // Calculate total for this row
-    calculateRowTotal(searchRow);
-    
-    // Calculate grand total
-    calculateGrandTotal();
+    // Check for discount bands on initial quantity (1)
+    if (searchRow) {
+        const itemIdInput = searchRow.querySelector('input[name*="wa_inventory_item_id"]');
+        const quantityInput = searchRow.querySelector('.quantity');
+        
+        if (itemIdInput && quantityInput) {
+            const itemId = itemIdInput.value;
+            const quantity = parseFloat(quantityInput.value) || 1;
+            
+            // Check discount band for initial quantity
+            checkDiscountBand(itemId, quantity, searchRow);
+        }
+    } else {
+        // Fallback calculation
+        calculateRowTotal(searchRow);
+        calculateGrandTotal();
+    }
 }
 
 function calculateRowTotal(row) {
@@ -542,6 +567,71 @@ function calculateGrandTotal() {
     if (totalElement) {
         totalElement.textContent = grandTotal.toFixed(2);
     }
+}
+
+function checkDiscountBand(itemId, quantity, row) {
+    console.log('Checking discount band for item:', itemId, 'quantity:', quantity);
+    
+    // Make AJAX call to check for discount bands
+    fetch(`{{ route('salesman-orders.calculate-discount') }}?inventory_item_id=${itemId}&item_quantity=${quantity}`)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Discount response:', data);
+            
+            if (data.result === 1) {
+                const priceInput = row.querySelector('.selling_price');
+                const discountInput = row.querySelector('.discount');
+                const originalPrice = data.original_price;
+                const discountedPrice = data.discounted_price;
+                const totalDiscount = data.discount || 0;
+                
+                // Update the price input with discounted price
+                if (discountedPrice < originalPrice) {
+                    priceInput.value = discountedPrice.toFixed(2);
+                    priceInput.style.backgroundColor = '#e8f5e8'; // Light green to show discount applied
+                    
+                    // Update hidden discount field
+                    if (discountInput) {
+                        discountInput.value = totalDiscount;
+                    }
+                    
+                    // Show discount information
+                    let discountInfo = row.querySelector('.discount-info');
+                    if (!discountInfo) {
+                        discountInfo = document.createElement('small');
+                        discountInfo.className = 'discount-info text-success';
+                        priceInput.parentNode.appendChild(discountInfo);
+                    }
+                    discountInfo.innerHTML = `<br>Original: KSh ${originalPrice}<br>${data.discount_description}`;
+                } else {
+                    priceInput.value = originalPrice.toFixed(2);
+                    priceInput.style.backgroundColor = '';
+                    
+                    // Reset discount field
+                    if (discountInput) {
+                        discountInput.value = 0;
+                    }
+                    
+                    // Remove discount info if exists
+                    const discountInfo = row.querySelector('.discount-info');
+                    if (discountInfo) {
+                        discountInfo.remove();
+                    }
+                }
+                
+                // Recalculate totals
+                calculateRowTotal(row);
+                calculateGrandTotal();
+            } else {
+                console.error('Error calculating discount:', data.errors || data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error checking discount band:', error);
+            // Fallback to normal calculation
+            calculateRowTotal(row);
+            calculateGrandTotal();
+        });
 }
 </script>
 

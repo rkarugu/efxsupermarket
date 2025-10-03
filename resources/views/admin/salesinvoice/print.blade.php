@@ -32,7 +32,7 @@ hr {
     <!-- Company Name & Address (centered) -->
     <tr>
         <td colspan="4" class="center">
-            <b style="font-size: 18px;">{!! strtoupper($all_settings['COMPANY_NAME'])!!}</b>
+            <b style="font-size: 18px;">*** CORRECT TEMPLATE *** {!! strtoupper($all_settings['COMPANY_NAME'])!!}</b>
         </td>
     </tr>
     <tr>
@@ -87,30 +87,30 @@ hr {
         <td colspan="4"><hr></td>
     </tr>
   </table>
-</div>
 <!-- Items Table -->
 <div style="width: 100%;" class="clearfix">
 <table style="width:100%; border-collapse: collapse;">
     <!-- Table Headers -->
     <tr style="border-bottom: 1px solid #000;">
-        <td style="font-weight: bold; text-align: left; padding: 5px;"><b>Uom</b></td>
+        <td style="font-weight: bold; text-align: left; padding: 5px;"><b>Subtotal: KSh {{number_format(array_sum($total_cost), 2)}}</b></td>
         <td style="font-weight: bold; text-align: left; padding: 5px;"><b>Qty</b></td>
         <td style="font-weight: bold; text-align: left; padding: 5px;"><b>Price</b></td>
         <td style="font-weight: bold; text-align: right; padding: 5px;"><b>Amount</b></td>
     </tr>
     
-    @if($row->getRelatedItem)
     <?php 
     $i = 1;
     $vat_amount = [];
     $total_cost = [];
+    $discount_amount = [];
     $service_charge_amount = [];
     $catering_levy_amount = [];
     $sub_total = [];
-    $totalItems = count($row->getRelatedItem);
+    $items = $itemsdata ?? $row->getRelatedItem;
+    $totalItems = count($items);
     ?>
     
-    @foreach($row->getRelatedItem as $index => $getRelatedItem)
+    @foreach($items as $index => $getRelatedItem)
     <!-- Item Row -->
     <tr>
         <td style="font-weight: bold; text-align: left; padding: 5px;">
@@ -121,10 +121,10 @@ hr {
             <b>{{$getRelatedItem->quantity ?? '1.00'}}</b>
         </td>
         <td style="font-weight: bold; text-align: left; padding: 5px;">
-            <b>x {{number_format($getRelatedItem->actual_unit_price ?? 2000, 2)}}</b>
+            <b>x {{number_format($getRelatedItem->selling_price ?? 2000, 2)}}</b>
         </td>
         <td style="font-weight: bold; text-align: right; padding: 5px;">
-            <b>{{number_format(($getRelatedItem->quantity ?? 1) * ($getRelatedItem->actual_unit_price ?? 2000), 2)}}</b>
+            <b>{{number_format(($getRelatedItem->quantity ?? 1) * ($getRelatedItem->selling_price ?? 2000), 2)}}</b>
         </td>
     </tr>
     
@@ -137,11 +137,16 @@ hr {
     
     <?php  
     $i++; 
+    $original_amount = ($getRelatedItem->quantity ?? 1) * ($getRelatedItem->selling_price ?? 2000);
+    $discount_per_item = ($getRelatedItem->discount ?? 0) * ($getRelatedItem->quantity ?? 1);
+    $discounted_amount = $original_amount - $discount_per_item;
+    
     $vat_amount[] = $getRelatedItem->vat_amount ?? 0;
-    $total_cost[] = $getRelatedItem->total_cost ?? (($getRelatedItem->quantity ?? 1) * ($getRelatedItem->actual_unit_price ?? 2000));
+    $total_cost[] = $original_amount; // Use original amount for subtotal calculation
+    $discount_amount[] = $discount_per_item;
     $service_charge_amount[] = $getRelatedItem->service_charge_amount ?? 0;
     $catering_levy_amount[] = $getRelatedItem->catering_levy_amount ?? 0;
-    $sub_total[] = $getRelatedItem->total_cost_with_vat ?? (($getRelatedItem->quantity ?? 1) * ($getRelatedItem->actual_unit_price ?? 2000));
+    $sub_total[] = $discounted_amount; // Use discounted amount for final total
     ?>
     @endforeach
     @endif
@@ -154,11 +159,15 @@ hr {
 	<table style="width: 100%; border-collapse: collapse;">
 	<tr> 
 		<td style="text-align: left; font-weight: bold; padding: 5px;"><b>No of Items</b></td>
-		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>{{count($row->getRelatedItem ?? [])}}</b></td>
+		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>{{count($items ?? [])}}</b></td>
 	</tr>
 	<tr> 
-		<td style="text-align: left; font-weight: bold; padding: 5px;"><b>Subtotal:</b></td>
-		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>KSh {{number_format(array_sum($total_cost) - array_sum($vat_amount), 2)}}</b></td>
+		<td style="text-align: left; font-weight: bold; padding: 5px;"><b>Subtotal: *** TEMPLATE WORKING ***</b></td>
+		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>KSh {{number_format(array_sum($total_cost), 2)}}</b></td>
+	</tr>
+	<tr> 
+		<td style="text-align: left; font-weight: bold; padding: 5px;"><b>Disc</b></td>
+		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>KSh {{number_format(array_sum($discount_amount ?? []), 2)}} (Debug: {{json_encode($discount_amount ?? [])}})</b></td>
 	</tr>
 	<tr> 
 		<td style="text-align: left; font-weight: bold; padding: 5px;"><b>VAT</b></td>
@@ -166,11 +175,11 @@ hr {
 	</tr>
 	<tr> 
 		<td style="text-align: left; font-weight: bold; padding: 5px;"><b>TOTAL INVOICE AMNT:</b></td>
-		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>KSh {{number_format(array_sum($total_cost), 2)}}</b></td>
+		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>KSh {{number_format(array_sum($sub_total), 2)}}</b></td>
 	</tr>
 	<tr> 
 		<td style="text-align: left; font-weight: bold; padding: 5px;"><b>CURBET DUE AMOUNT</b></td>
-		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>KSh {{number_format(array_sum($total_cost), 2)}}</b></td>
+		<td style="text-align: right; font-weight: bold; padding: 5px;"><b>KSh {{number_format(array_sum($sub_total), 2)}}</b></td>
 	</tr>
 	<tr> 
 		<td style="text-align: left; font-weight: bold; padding: 5px;"><b>ACCOUNT BALANCE</b></td>

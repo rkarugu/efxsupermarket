@@ -92,6 +92,14 @@ class ItemPromotionsController extends Controller
         $basePath = $this->basePath;
         $breadcum = [$title => route('item-centre.show', $itemId), 'Create' => ''];
 
+        // Add validation for dates
+        $request->validate([
+            'from_date' => 'required|date',
+            'to_date' => 'nullable|date|after_or_equal:from_date',
+            'promotion_type_id' => 'required|exists:promotion_types,id',
+            'supplier_id' => 'required'
+        ]);
+
         try{
         $inventoryItem = WaInventoryItem::with('supplier_data')->find($itemId);
 
@@ -280,7 +288,7 @@ class ItemPromotionsController extends Controller
             $promotion->save();
             
         
-        return redirect()->route("item-centre.show", $itemId)->with('success', 'Promotion blocked successfully' );
+        return redirect()->route("item-centre.show", $itemId)->with('success', 'Promotion unblocked successfully' );
 
 
         }catch(\Throwable $e){
@@ -325,10 +333,12 @@ class ItemPromotionsController extends Controller
         LEFT JOIN
             users ON item_promotions.initiated_by = users.id        
         ";
+        $bindings = [];
         if($request->item){
-            $query.= " WHERE item_promotions.inventory_item_id = $request->item ";
+            $query.= " WHERE item_promotions.inventory_item_id = ? ";
+            $bindings[] = $request->item;
         }
-        $data  = DB::select($query);
+        $data  = DB::select($query, $bindings);
 
         if($request->type && $request->type == 'Download'){
             $export = new ItemsWithPromotionsExport(collect($data));

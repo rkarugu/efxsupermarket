@@ -692,4 +692,55 @@ class SalesInvoiceController extends Controller
         }
 
     }
+
+    public function print(Request $request)
+    {
+        $slug = $request->slug;
+        $title = 'Sales Invoice Print';
+        $model = 'sales-invoice';
+        $breadcum = ['Sales Invoice' => route('sales-invoice.index'), 'Print' => ''];
+        $row = WaInternalRequisition::whereSlug($slug)->first();
+        $list = $row;
+        $itemsdata = WaInternalRequisitionItem::query()
+            ->select(
+                'wa_internal_requisition_items.*',
+                'wa_unit_of_measures.title as bin'
+            )
+            ->join('wa_inventory_items', 'wa_inventory_items.id', '=', 'wa_internal_requisition_items.wa_inventory_item_id')
+            ->join('wa_inventory_location_uom', function ($join) use ($list) {
+                $join->on('wa_inventory_items.id', '=', 'wa_inventory_location_uom.inventory_id')
+                    ->where('wa_inventory_location_uom.location_id', $list->to_store_id);
+            })
+            ->join('wa_unit_of_measures', 'wa_inventory_location_uom.uom_id', '=', 'wa_unit_of_measures.id')
+            ->where('wa_internal_requisition_items.wa_internal_requisition_id', $list->id)
+            ->orderBy('wa_inventory_items.stock_id_code', 'ASC')
+            ->get();
+        return view('admin.salesinvoice.print', compact('title', 'model', 'breadcum', 'row', 'list', 'itemsdata'));
+    }
+
+    public function exportToPdf($slug)
+    {
+        $title = 'Sales Invoice PDF';
+        $model = 'sales-invoice';
+        $breadcum = ['Sales Invoice' => route('sales-invoice.index'), 'PDF' => ''];
+        $list = WaInternalRequisition::whereSlug($slug)->first();
+        $itemsdata = WaInternalRequisitionItem::query()
+            ->select(
+                'wa_internal_requisition_items.*',
+                'wa_unit_of_measures.title as bin'
+            )
+            ->join('wa_inventory_items', 'wa_inventory_items.id', '=', 'wa_internal_requisition_items.wa_inventory_item_id')
+            ->join('wa_inventory_location_uom', function ($join) use ($list) {
+                $join->on('wa_inventory_items.id', '=', 'wa_inventory_location_uom.inventory_id')
+                    ->where('wa_inventory_location_uom.location_id', $list->to_store_id);
+            })
+            ->join('wa_unit_of_measures', 'wa_inventory_location_uom.uom_id', '=', 'wa_unit_of_measures.id')
+            ->where('wa_internal_requisition_items.wa_internal_requisition_id', $list->id)
+            ->orderBy('wa_inventory_items.stock_id_code', 'ASC')
+            ->get();
+
+        $pdf = \PDF::loadView('admin.salesinvoice.print', compact('title', 'model', 'breadcum', 'list', 'itemsdata'));
+        $report_name = 'sales_invoice_' . date('Y_m_d_H_i_A');
+        return $pdf->download($report_name . '.pdf');
+    }
 }

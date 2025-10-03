@@ -562,7 +562,8 @@ class CashSalesController extends Controller
 
         if ($promotion) {
             /*get promotion type*/
-            $promotionType = $promotion->promotion_type_id ? PromotionType::find($promotion->promotion_type_id)->description : null;
+            $promotionTypeModel = $promotion->promotion_type_id ? PromotionType::find($promotion->promotion_type_id) : null;
+            $promotionType = $promotionTypeModel ? $promotionTypeModel->description : null;
 
             if ($promotionType) {
 

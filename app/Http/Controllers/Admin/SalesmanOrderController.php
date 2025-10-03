@@ -16,6 +16,7 @@ use App\Model\DeliveryCentres;
 use App\Model\WaStockMove;
 use App\SalesmanShift;
 use App\Model\WaNumerSeriesCode;
+use App\DiscountBand;
 use App\Jobs\PerformPostSaleActions;
 use App\Jobs\PrepareStoreParkingList;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -801,6 +802,77 @@ class SalesmanOrderController extends Controller
     }
 
     /**
+     * Calculate discount for inventory item based on quantity
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function calculateItemDiscount(Request $request)
+    {
+        $validation = \Validator::make($request->all(), [
+            'inventory_item_id' => 'required|exists:wa_inventory_items,id',
+            'item_quantity' => 'required|numeric|min:1',
+        ]);
+        
+        if ($validation->fails()) {
+            return response()->json([
+                'result' => 0,
+                'errors' => $validation->errors()
+            ], 403);
+        }
+
+        $inventory_item_id = $request->inventory_item_id;
+        $quantity = $request->item_quantity;
+        
+        $discount = 0;
+        $discountDescription = null;
+        $discountedPrice = null;
+        $originalPrice = null;
+        
+        // Get the item
+        $item = WaInventoryItem::find($inventory_item_id);
+        if (!$item) {
+            return response()->json([
+                'result' => 0,
+                'message' => 'Item not found'
+            ], 404);
+        }
+        
+        $originalPrice = $item->selling_price;
+        
+        // Find applicable discount band
+        $discountBand = DiscountBand::where('inventory_item_id', $inventory_item_id)
+            ->where('status', 'APPROVED')
+            ->where(function ($query) use ($quantity) {
+                $query->where('from_quantity', '<=', $quantity)
+                    ->where(function($q) use ($quantity) {
+                        $q->where('to_quantity', '>=', $quantity)
+                          ->orWhereNull('to_quantity');
+                    });
+            })
+            ->orderBy('from_quantity', 'desc')
+            ->first();
+            
+        if ($discountBand) {
+            $discount = $discountBand->discount_amount * $quantity;
+            $discountedPrice = max(0, $item->selling_price - $discountBand->discount_amount);
+            $discountDescription = "Discount of KSh {$discountBand->discount_amount} per unit for quantity {$discountBand->from_quantity}" . 
+                                 ($discountBand->to_quantity ? " to {$discountBand->to_quantity}" : "+");
+        } else {
+            $discountedPrice = $originalPrice;
+        }
+        
+        return response()->json([
+            'result' => 1,
+            'discount' => $discount,
+            'discount_description' => $discountDescription,
+            'discounted_price' => $discountedPrice,
+            'original_price' => $originalPrice,
+            'item_id' => $inventory_item_id,
+            'quantity' => $quantity
+        ]);
+    }
+
+    /**
      * Search inventory items for order creation
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
@@ -832,13 +904,27 @@ class SalesmanOrderController extends Controller
                     ->where('wa_location_and_store_id', $request->store_location_id)
                     ->sum('qauntity');
                 
+                // Check for discount bands
+                $discountBands = DiscountBand::where('inventory_item_id', $item->id)
+                    ->where('status', 'APPROVED')
+                    ->orderBy('from_quantity', 'asc')
+                    ->get();
+                
                 $results[] = [
                     'id' => $item->id,
                     'item_name' => $item->title,
                     'stock_code' => $item->stock_id_code,
                     'unit_name' => $item->pack_size->title ?? 'Unit',
                     'available_stock' => $qoh ?? 0,
-                    'selling_price' => $item->selling_price
+                    'selling_price' => $item->selling_price,
+                    'discount_bands' => $discountBands->map(function($band) {
+                        return [
+                            'from_quantity' => $band->from_quantity,
+                            'to_quantity' => $band->to_quantity,
+                            'discount_amount' => $band->discount_amount,
+                            'discounted_price' => max(0, $band->inventoryItem->selling_price - $band->discount_amount)
+                        ];
+                    })
                 ];
             }
             
@@ -1250,5 +1336,47 @@ class SalesmanOrderController extends Controller
         } catch (\Exception $e) {
             return "<h2>❌ Error!</h2><br>Failed to create default customer: " . $e->getMessage();
         }
+    }
+
+    /**
+     * Test discount calculation for debugging
+     * @param int $itemId
+     * @param int $quantity
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function testDiscount($itemId, $quantity)
+    {
+        $item = WaInventoryItem::find($itemId);
+        if (!$item) {
+            return response()->json(['error' => 'Item not found']);
+        }
+
+        $discountBands = DiscountBand::where('inventory_item_id', $itemId)
+            ->where('status', 'APPROVED')
+            ->orderBy('from_quantity', 'asc')
+            ->get();
+
+        $applicableDiscount = DiscountBand::where('inventory_item_id', $itemId)
+            ->where('status', 'APPROVED')
+            ->where(function ($query) use ($quantity) {
+                $query->where('from_quantity', '<=', $quantity)
+                    ->where(function($q) use ($quantity) {
+                        $q->where('to_quantity', '>=', $quantity)
+                          ->orWhereNull('to_quantity');
+                    });
+            })
+            ->orderBy('from_quantity', 'desc')
+            ->first();
+
+        return response()->json([
+            'item' => $item->title,
+            'quantity' => $quantity,
+            'original_price' => $item->selling_price,
+            'all_discount_bands' => $discountBands,
+            'applicable_discount' => $applicableDiscount,
+            'discounted_price' => $applicableDiscount ? 
+                max(0, $item->selling_price - $applicableDiscount->discount_amount) : 
+                $item->selling_price
+        ]);
     }
 }
