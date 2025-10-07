@@ -9,3 +9,8 @@
 /public/hot
 node_modules/
 storage/logs/laravel.log
+
+# Laravel cache files
+/storage/framework/views/*.php
+/storage/framework/cache/*
+/storage/framework/sessions/*
