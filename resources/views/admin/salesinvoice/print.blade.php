@@ -31,29 +31,29 @@ hr {
   <table class="table" style="width: 100%;">
     <!-- Company Name & Address (centered) -->
     <tr>
-        <td colspan="4" class="center">
-            <b style="font-size: 18px;">*** CORRECT TEMPLATE *** {!! strtoupper($all_settings['COMPANY_NAME'])!!}</b>
+        <td colspan="5" class="center">
+            <b style="font-size: 18px;">*** UOM TEMPLATE UPDATED *** {!! strtoupper($all_settings['COMPANY_NAME'])!!}</b>
         </td>
     </tr>
     <tr>
-        <td colspan="4" class="center">
+        <td colspan="5" class="center">
             <b>INVOICE</b>
         </td>
     </tr>
     <tr>
-        <td colspan="4" class="center">
+        <td colspan="5" class="center">
             <b>{!! strtoupper($all_settings['ADDRESS_1'])!!}, {!! strtoupper($all_settings['ADDRESS_2'])!!}</b>
         </td>
     </tr>
     <tr>
-        <td colspan="4" class="center">
+        <td colspan="5" class="center">
             <b>Mobile: {!! $all_settings['PHONE_NUMBER'] ?? '0740804489' !!}</b>
         </td>
     </tr>
     
     @if($row->print_count > 1)
     <tr>
-        <td colspan="4" class="center">
+        <td colspan="5" class="center">
             <b>REPRINT INVOICE COUNT: {{$row->print_count - 1}}</b>
         </td>
     </tr>
@@ -61,12 +61,12 @@ hr {
     
     <!-- Horizontal Line -->
     <tr>
-        <td colspan="4"><hr></td>
+        <td colspan="5"><hr></td>
     </tr>
     
     <!-- Customer Details Section -->
     <tr>
-        <td colspan="4" style="text-align: left; padding: 10px 0;">
+        <td colspan="5" style="text-align: left; padding: 10px 0;">
             <div style="line-height: 1.4;">
                 <b>Invoice No.: {{$row->sales_invoice_number}}</b><br>
                 <b>Company PIN: {{$all_settings['PIN_NO'] ?? 'Https://testing.com'}}</b><br>
@@ -84,7 +84,7 @@ hr {
     
     <!-- Horizontal Line -->
     <tr>
-        <td colspan="4"><hr></td>
+        <td colspan="5"><hr></td>
     </tr>
   </table>
 <!-- Items Table -->
@@ -92,7 +92,8 @@ hr {
 <table style="width:100%; border-collapse: collapse;">
     <!-- Table Headers -->
     <tr style="border-bottom: 1px solid #000;">
-        <td style="font-weight: bold; text-align: left; padding: 5px;"><b>Subtotal: KSh {{number_format(array_sum($total_cost), 2)}}</b></td>
+        <td style="font-weight: bold; text-align: left; padding: 5px;"><b>Item</b></td>
+        <td style="font-weight: bold; text-align: left; padding: 5px;"><b>UOM</b></td>
         <td style="font-weight: bold; text-align: left; padding: 5px;"><b>Qty</b></td>
         <td style="font-weight: bold; text-align: left; padding: 5px;"><b>Price</b></td>
         <td style="font-weight: bold; text-align: right; padding: 5px;"><b>Amount</b></td>
@@ -114,8 +115,10 @@ hr {
     <!-- Item Row -->
     <tr>
         <td style="font-weight: bold; text-align: left; padding: 5px;">
-            <b>{{strtoupper($getRelatedItem->item_name ?? 'SOLAI MMEAL 12X2KG BALE')}}</b><br>
-            <b>Pc(s)</b>
+            <b>{{strtoupper($getRelatedItem->item_name ?? 'SOLAI MMEAL 12X2KG BALE')}}</b>
+        </td>
+        <td style="font-weight: bold; text-align: left; padding: 5px;">
+            <b>{{$getRelatedItem->getInventoryItemDetail->getUnitOfMeausureDetail->title ?? 'DEBUG-UOM'}}</b>
         </td>
         <td style="font-weight: bold; text-align: left; padding: 5px;">
             <b>{{$getRelatedItem->quantity ?? '1.00'}}</b>
@@ -131,7 +134,7 @@ hr {
     @if($index < $totalItems - 1)
     <!-- Horizontal Line between items -->
     <tr>
-        <td colspan="4"><hr style="margin: 2px 0;"></td>
+        <td colspan="5"><hr style="margin: 2px 0;"></td>
     </tr>
     @endif
     

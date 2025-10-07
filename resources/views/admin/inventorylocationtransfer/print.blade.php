@@ -107,7 +107,36 @@ $getLoggeduserProfile = getLoggeduserProfile();
                 <b>Served By: {{$list->user->name ?? getLoggeduserProfile()->name}}</b><br>
                 <b>Customer Account: {{$customer->account_type ?? 'TEST BUSINESS'}}</b><br>
                 <b>Mobile: {{$list->customer_phone_number ?? $customer->telephone ?? '0700'}}</b><br>
-                <b>B/F: KSh {{number_format($customer->balance ?? 100, 2)}}</b>
+                @php
+                    // Check if this is first print or reprint
+                    if ($list->print_count == 1 && is_null($list->printed_bf_balance)) {
+                        // FIRST PRINT: Calculate and store the values
+                        
+                        // Get current invoice amount
+                        $currentInvoiceAmount = 0;
+                        foreach($list->getRelatedItem as $item) {
+                            $currentInvoiceAmount += ($item->quantity * $item->selling_price);
+                        }
+                        
+                        // Get total used amount (includes current invoice)
+                        $used_limit = \App\Model\WaDebtorTran::where('wa_customer_id', $customer->id ?? 0)->sum('amount');
+                        
+                        // B/F = Used - Current Invoice (shows balance BEFORE this invoice)
+                        $currentBalance = $used_limit - $currentInvoiceAmount;
+                        $accountBalance = $used_limit;
+                        
+                        // Store these values in database for future reprints
+                        $list->printed_bf_balance = $currentBalance;
+                        $list->printed_account_balance = $accountBalance;
+                        $list->save();
+                    } else {
+                        // REPRINT: Use stored values
+                        $currentBalance = $list->printed_bf_balance ?? 0;
+                        $accountBalance = $list->printed_account_balance ?? 0;
+                        $used_limit = $accountBalance; // For the account balance display
+                    }
+                @endphp
+                <b>B/F: KSh {{number_format($currentBalance, 2)}}</b>
             </td>
         </tr>
         
@@ -139,8 +168,7 @@ $getLoggeduserProfile = getLoggeduserProfile();
             <!-- Item Row -->
             <tr>
                 <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>{{$index + 1}} {{strtoupper($item->getInventoryItemDetail->title)}}</b><br>
-                    <b>Pc(s)</b>
+                    <b>{{$index + 1}} {{strtoupper($item->getInventoryItemDetail->title)}}</b>
                 </td>
                 <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
                     <b>{{number_format($item->quantity, 2)}}</b>
@@ -200,7 +228,7 @@ $getLoggeduserProfile = getLoggeduserProfile();
         </tr>
         <tr> 
             <td style="text-align: left; font-weight: bold; padding: 8px;"><b>ACCOUNT BALANCE</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format(100, 2)}}</b></td>
+            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($used_limit, 2)}}</b></td>
         </tr>
     </table>
 

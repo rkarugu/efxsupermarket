@@ -506,7 +506,7 @@ class InternalRequisitionController extends Controller
             $model = $this->model;
             foreach ($row->getRelatedItem as $relatedItem) {
                 $ItemBin = WaInventoryLocationUom::where('inventory_id', $relatedItem->wa_inventory_item_id)->where('location_id', $row->to_store_id)->get();
-                if ($ItemBin[0]->uom_id) {
+                if ($ItemBin->count() > 0 && $ItemBin[0]->uom_id) {
                     $itemBinLocationName = WaUnitOfMeasure::find($ItemBin[0]->uom_id)->title;
                     $relatedItem->uom = $itemBinLocationName;
                 } else {
