@@ -243,7 +243,7 @@ class PosCashSaleService
 
     private static function generateNewSalesNumber(): string
     {
-        $maxAttempts = 5;
+        $maxAttempts = 10;
         $attempt = 1;
 
         while ($attempt <= $maxAttempts) {
@@ -253,22 +253,52 @@ class PosCashSaleService
                     ->lockForUpdate()
                     ->first();
 
+                if (!$series_module) {
+                    throw new \RuntimeException('CASH_SALES number series not found');
+                }
+
                 $lastNumberUsed = $series_module->last_number_used;
                 $newNumber = (int)$lastNumberUsed + 1;
                 $sales_no = $series_module->code . '-' . str_pad($newNumber, 5, "0", STR_PAD_LEFT);
 
-                $exists = WaInternalRequisition::where('requisition_no', $sales_no)->exists();
+                // Check for uniqueness in BOTH tables to prevent conflicts
+                $existsInCashSales = WaPosCashSales::where('sales_no', $sales_no)->exists();
+                $existsInRequisition = WaInternalRequisition::where('requisition_no', $sales_no)->exists();
 
-                if (!$exists) {
+                if (!$existsInCashSales && !$existsInRequisition) {
                     $series_module->update(['last_number_used' => $newNumber]);
                     DB::commit();
+                    
+                    // Log successful generation for debugging
+                    \Log::info('Generated unique sales number', [
+                        'sales_no' => $sales_no,
+                        'attempt' => $attempt
+                    ]);
+                    
                     return $sales_no;
                 }
+                
                 DB::rollBack();
+                
+                // Log collision for debugging
+                \Log::warning('Sales number collision detected', [
+                    'sales_no' => $sales_no,
+                    'attempt' => $attempt,
+                    'exists_in_cash_sales' => $existsInCashSales,
+                    'exists_in_requisition' => $existsInRequisition
+                ]);
+                
                 $attempt++;
+                
+                // Add small delay to reduce race conditions
+                usleep(rand(10000, 50000)); // 10-50ms random delay
 
             } catch (\Exception $e) {
                 DB::rollBack();
+                \Log::error('Error generating sales number', [
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage()
+                ]);
                 throw $e;
             }
         }
