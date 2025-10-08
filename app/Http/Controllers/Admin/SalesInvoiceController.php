@@ -458,7 +458,18 @@ class SalesInvoiceController extends Controller
                     'discount_description' => $discountDescription,
                 ]);
 
-                $promotion = ItemPromotion::where('inventory_item_id', $inventoryItem->id)->where('status', 'active')->whereNotNull('promotion_item_id')->first();
+                $promotion = ItemPromotion::where('inventory_item_id', $inventoryItem->id)
+                    ->where('status', 'active')
+                    ->whereNotNull('promotion_item_id')
+                    ->where(function ($query) {
+                        $today = \Carbon\Carbon::today();
+                        $query->where('from_date', '<=', $today)
+                            ->where(function ($subQuery) use ($today) {
+                                $subQuery->where('to_date', '>=', $today)
+                                         ->orWhereNull('to_date');
+                            });
+                    })
+                    ->first();
                 if ($promotion) {
                     $promotionBatches = floor($orderQty / (float)$promotion->sale_quantity);
                     if ($promotionBatches > 0) {

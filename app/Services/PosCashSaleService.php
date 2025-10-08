@@ -110,9 +110,38 @@ class PosCashSaleService
         foreach ($items as $item) {
 
             $selling_price = $products->firstWhere('id', $item['item_id'])->selling_price;
-            $promotion = ItemPromotion::where('inventory_item_id', $item['item_id'])->where('status', 'active')->first();
+            $promotion = ItemPromotion::where('inventory_item_id', $item['item_id'])
+            ->where('status', 'active')
+            ->where(function ($query) {
+                $today = Carbon::today();
+                $query->where('from_date', '<=', $today)
+                    ->where(function ($subQuery) use ($today) {
+                        $subQuery->where('to_date', '>=', $today)
+                                 ->orWhereNull('to_date');
+                    });
+            })
+            ->first();
+            
+            // DEBUG: Log promotion detection
+            \Log::info("Promotion Debug for Item {$item['item_id']}", [
+                'promotion_found' => $promotion ? true : false,
+                'promotion_id' => $promotion ? $promotion->id : null,
+                'item_quantity' => $item['item_quantity'],
+                'today' => Carbon::today()->toDateString()
+            ]);
 
-
+            if ($promotion) {
+                \Log::info("Promotion Details", [
+                    'promotion_type_id' => $promotion->promotion_type_id,
+                    'sale_quantity' => $promotion->sale_quantity,
+                    'promotion_quantity' => $promotion->promotion_quantity,
+                    'promotion_item_id' => $promotion->promotion_item_id,
+                    'status' => $promotion->status,
+                    'from_date' => $promotion->from_date,
+                    'to_date' => $promotion->to_date
+                ]);
+            }
+            
             if ($promotion) {
                 /*get promotion type*/
                 $promotionType = $promotion->promotion_type_id ? PromotionType::find($promotion->promotion_type_id)->description : null;
@@ -159,6 +188,50 @@ class PosCashSaleService
                         ];
                         self::raiseDemand($data);
 
+                    }
+
+                    /*Buy X Get Y Free*/
+                    if ($promotionType == PromotionMatrix::BSGY->value)
+                    {
+                        $orderQty = $item['item_quantity'];
+                        $promotionBatches = floor($orderQty / (float)$promotion->sale_quantity);
+
+                        if ($promotionBatches > 0) {
+                            $promotionQty = $promotionBatches * $promotion->promotion_quantity;
+                            $promotionItem = WaInventoryItem::find($promotion->promotion_item_id);
+                            $promotionItemQoh = WaStockMove::where('wa_inventory_item_id', $promotionItem->id)->where('wa_location_and_store_id', $user->wa_location_and_store_id)->sum('qauntity');
+                            if ($promotionQty <= $promotionItemQoh) {
+                                $childs[] = [
+                                    'wa_pos_cash_sales_id'=> $parent->id,
+                                    'wa_inventory_item_id'=> $promotionItem->id,
+                                    'store_location_id'=> $user->wa_location_and_store_id,
+                                    'qty' => $promotionQty,
+                                    'selling_price' => 0,
+                                    'discount_percent' => 0,
+                                    'total' => 0,
+                                    'discount_amount' => 0,
+                                    'vat_percentage' => 0,
+                                    'vat_amount' => 0,
+                                    'tax_manager_id' => $promotionItem->tax_manager_id,
+                                    'created_at' => $dateTime,
+                                    'updated_at' => $dateTime,
+                                    'standard_cost' => $promotionItem->standard_cost,
+                                ];
+                                
+                                \Log::info("Free item added to sale", [
+                                    'promotion_item_id' => $promotionItem->id,
+                                    'promotion_qty' => $promotionQty,
+                                    'customer_bought' => $orderQty,
+                                    'promotion_batches' => $promotionBatches
+                                ]);
+                            } else {
+                                \Log::warning("Insufficient stock for promotion item", [
+                                    'promotion_item_id' => $promotionItem->id,
+                                    'required_qty' => $promotionQty,
+                                    'available_qty' => $promotionItemQoh
+                                ]);
+                            }
+                        }
                     }
 
                 }else

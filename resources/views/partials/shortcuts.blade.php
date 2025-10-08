@@ -263,6 +263,9 @@
 
                 $(".remove_error").remove();
                 if (out.result == 0) {
+                    // Re-enable button on validation errors
+                    $button.prop('disabled', false).html(originalText);
+                    
                     for (let i in out.errors) {
                         var id = i.split(".");
                         if (id && id[1]) {
@@ -276,6 +279,9 @@
                 }
                 if (out.result === 1) {
                     form.successMessage(out.message);
+                    // Disable all form buttons to prevent duplicate submissions
+                    $('.addExpense').prop('disabled', true);
+                    
                     if (out.location) {
                         // Only auto-print for "send_request" (process), not for "save"
                         if (out.requestty === 'send_request') {
@@ -291,10 +297,8 @@
                             };
                             return;
                         } else {
-                            // For "save" action, just redirect without printing
-                            setTimeout(() => {
-                                location.href = out.location;
-                            }, 1000);
+                            // For "save" action, redirect immediately without delay
+                            location.href = out.location;
                             return;
                         }
                     }
@@ -306,9 +310,13 @@
                     $('#loadingModal').modal('show')
                 }
                 if (out.result === -1) {
+                    // Re-enable button on server errors
+                    $button.prop('disabled', false).html(originalText);
                     form.errorMessage(out.message);
                 }
                 if (out.result === -2) {
+                    // Re-enable button on payment errors
+                    $button.prop('disabled', false).html(originalText);
                     form.errorMessage(out.message);
                 }
                 if (out.result === 2) {
@@ -326,10 +334,9 @@
             error: function (err) {
                 $('#loader-on').hide();
                 $(".remove_error").remove();
-                form.errorMessage('Something went wrong');
-            },
-            complete: function() {
+                // Re-enable button on AJAX errors
                 $button.prop('disabled', false).html(originalText);
+                form.errorMessage('Something went wrong');
             }
         });
     }

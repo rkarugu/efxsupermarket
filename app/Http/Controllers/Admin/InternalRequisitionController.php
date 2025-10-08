@@ -29,6 +29,7 @@ use App\Model\WaUnitOfMeasure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use App\DiscountBand;
+use App\ItemPromotion;
 use PDF;
 use Session;
 use Illuminate\Support\Facades\Validator;
@@ -390,6 +391,56 @@ class InternalRequisitionController extends Controller
                         $finalPrice = max(0, $originalPrice - $discountBand->discount_amount);
                     }
                     
+                    // Check for Buy X Get Y promotions
+                    $promotion = ItemPromotion::where('inventory_item_id', $value->id)
+                        ->where('status', 'active')
+                        ->whereNotNull('promotion_item_id')
+                        ->where(function ($query) {
+                            $today = \Carbon\Carbon::today();
+                            $query->where('from_date', '<=', $today)
+                                ->where(function ($subQuery) use ($today) {
+                                    $subQuery->where('to_date', '>=', $today)
+                                             ->orWhereNull('to_date');
+                                });
+                        })
+                        ->first();
+                        
+                    if ($promotion) {
+                        $promotionBatches = floor($quantity / (float)$promotion->sale_quantity);
+                        if ($promotionBatches > 0) {
+                            $promotionQty = $promotionBatches * $promotion->promotion_quantity;
+                            $promotionItem = WaInventoryItem::find($promotion->promotion_item_id);
+                            
+                            if ($promotionItem) {
+                                // Add free item to childs array
+                                $childs[] = [
+                                    'wa_internal_requisition_id' => $row->id,
+                                    'wa_inventory_item_id' => $promotionItem->id,
+                                    'quantity' => $promotionQty,
+                                    'standard_cost' => $promotionItem->standard_cost,
+                                    'selling_price' => 0, // Free item
+                                    'total_cost' => 0, // Free item
+                                    'tax_manager_id' => $promotionItem->tax_manager_id,
+                                    'vat_rate' => 0,
+                                    'vat_amount' => 0,
+                                    'total_cost_with_vat' => 0,
+                                    'created_at' => date('Y-m-d H:i:s'),
+                                    'store_location_id' => $getLoggeduserProfile->store_location_id,
+                                    'updated_at' => date('Y-m-d H:i:s'),
+                                    'hs_code' => $promotionItem->hs_code,
+                                    'discount' => 0,
+                                ];
+                                
+                                \Log::info("Credit Invoice: Free item added", [
+                                    'promotion_item_id' => $promotionItem->id,
+                                    'promotion_qty' => $promotionQty,
+                                    'customer_bought' => $quantity,
+                                    'promotion_batches' => $promotionBatches
+                                ]);
+                            }
+                        }
+                    }
+                    
                     $vat_rate = 0;
                     $vat_amount = 0;
                     $totalcost = $finalPrice * $quantity;
@@ -686,6 +737,56 @@ class InternalRequisitionController extends Controller
                     if ($discountBand) {
                         $discountAmount = $discountBand->discount_amount; // Per unit discount
                         $finalPrice = max(0, $originalPrice - $discountBand->discount_amount);
+                    }
+                    
+                    // Check for Buy X Get Y promotions
+                    $promotion = ItemPromotion::where('inventory_item_id', $value->id)
+                        ->where('status', 'active')
+                        ->whereNotNull('promotion_item_id')
+                        ->where(function ($query) {
+                            $today = \Carbon\Carbon::today();
+                            $query->where('from_date', '<=', $today)
+                                ->where(function ($subQuery) use ($today) {
+                                    $subQuery->where('to_date', '>=', $today)
+                                             ->orWhereNull('to_date');
+                                });
+                        })
+                        ->first();
+                        
+                    if ($promotion) {
+                        $promotionBatches = floor($quantity / (float)$promotion->sale_quantity);
+                        if ($promotionBatches > 0) {
+                            $promotionQty = $promotionBatches * $promotion->promotion_quantity;
+                            $promotionItem = WaInventoryItem::find($promotion->promotion_item_id);
+                            
+                            if ($promotionItem) {
+                                // Add free item to childs array
+                                $childs[] = [
+                                    'wa_internal_requisition_id' => $row->id,
+                                    'wa_inventory_item_id' => $promotionItem->id,
+                                    'quantity' => $promotionQty,
+                                    'standard_cost' => $promotionItem->standard_cost,
+                                    'selling_price' => 0, // Free item
+                                    'total_cost' => 0, // Free item
+                                    'tax_manager_id' => $promotionItem->tax_manager_id,
+                                    'vat_rate' => 0,
+                                    'vat_amount' => 0,
+                                    'total_cost_with_vat' => 0,
+                                    'created_at' => date('Y-m-d H:i:s'),
+                                    'store_location_id' => $getLoggeduserProfile->store_location_id,
+                                    'updated_at' => date('Y-m-d H:i:s'),
+                                    'hs_code' => $promotionItem->hs_code,
+                                    'discount' => 0,
+                                ];
+                                
+                                \Log::info("Credit Invoice Update: Free item added", [
+                                    'promotion_item_id' => $promotionItem->id,
+                                    'promotion_qty' => $promotionQty,
+                                    'customer_bought' => $quantity,
+                                    'promotion_batches' => $promotionBatches
+                                ]);
+                            }
+                        }
                     }
                     
                     $vat_rate = 0;
