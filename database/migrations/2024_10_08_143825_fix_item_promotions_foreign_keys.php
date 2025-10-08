@@ -12,12 +12,37 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('item_promotions', function (Blueprint $table) {
-            // Add foreign key constraints that might be missing
+            // First, modify column types to match referenced tables if needed
             
-            // Check if promotion_type_id foreign key exists, if not add it
-            if (!$this->foreignKeyExists('item_promotions', 'item_promotions_promotion_type_id_foreign')) {
-                $table->foreign('promotion_type_id')->references('id')->on('promotion_types')->onDelete('cascade');
+            // Ensure promotion_type_id is the correct type (string to match promotion_types.id)
+            if (Schema::hasColumn('item_promotions', 'promotion_type_id')) {
+                $table->string('promotion_type_id')->nullable()->change();
             }
+            
+            // Ensure promotion_group_id is unsigned integer
+            if (Schema::hasColumn('item_promotions', 'promotion_group_id')) {
+                $table->unsignedBigInteger('promotion_group_id')->nullable()->change();
+            }
+            
+            // Ensure wa_demand_id is unsigned integer
+            if (Schema::hasColumn('item_promotions', 'wa_demand_id')) {
+                $table->unsignedBigInteger('wa_demand_id')->nullable()->change();
+            }
+            
+            // Ensure supplier_id is string to match wa_suppliers.id
+            if (Schema::hasColumn('item_promotions', 'supplier_id')) {
+                $table->string('supplier_id')->nullable()->change();
+            }
+            
+            // Add status column if it doesn't exist
+            if (!Schema::hasColumn('item_promotions', 'status')) {
+                $table->enum('status', ['active', 'inactive', 'blocked'])->default('active');
+            }
+        });
+        
+        // Add foreign key constraints in a separate schema call after column modifications
+        Schema::table('item_promotions', function (Blueprint $table) {
+            // Add foreign key constraints that might be missing
             
             // Check if promotion_group_id foreign key exists, if not add it
             if (!$this->foreignKeyExists('item_promotions', 'item_promotions_promotion_group_id_foreign')) {
@@ -29,15 +54,8 @@ return new class extends Migration
                 $table->foreign('wa_demand_id')->references('id')->on('wa_demands')->onDelete('cascade');
             }
             
-            // Check if supplier_id foreign key exists, if not add it
-            if (!$this->foreignKeyExists('item_promotions', 'item_promotions_supplier_id_foreign')) {
-                $table->foreign('supplier_id')->references('id')->on('wa_suppliers')->onDelete('cascade');
-            }
-            
-            // Add status column if it doesn't exist
-            if (!Schema::hasColumn('item_promotions', 'status')) {
-                $table->enum('status', ['active', 'inactive', 'blocked'])->default('active');
-            }
+            // Note: Skipping promotion_type_id and supplier_id foreign keys as they may have string IDs
+            // These will be handled by validation in the controller instead
         });
     }
 
@@ -48,20 +66,12 @@ return new class extends Migration
     {
         Schema::table('item_promotions', function (Blueprint $table) {
             // Drop foreign keys if they exist
-            if ($this->foreignKeyExists('item_promotions', 'item_promotions_promotion_type_id_foreign')) {
-                $table->dropForeign(['promotion_type_id']);
-            }
-            
             if ($this->foreignKeyExists('item_promotions', 'item_promotions_promotion_group_id_foreign')) {
                 $table->dropForeign(['promotion_group_id']);
             }
             
             if ($this->foreignKeyExists('item_promotions', 'item_promotions_wa_demand_id_foreign')) {
                 $table->dropForeign(['wa_demand_id']);
-            }
-            
-            if ($this->foreignKeyExists('item_promotions', 'item_promotions_supplier_id_foreign')) {
-                $table->dropForeign(['supplier_id']);
             }
             
             // Drop status column if it exists
