@@ -151,7 +151,11 @@ function formatNumber($number) {
             <!-- Item Row -->
             <tr>
                 <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>{{$index + 1}}. {{strtoupper($item->getInventoryItemDetail->title)}}</b>
+                    <b>{{$index + 1}}. {{strtoupper($item->getInventoryItemDetail->title)}}
+                    @if($item->selling_price == 0)
+                        <span style="color: #008000;"> - FREE ITEM</span>
+                    @endif
+                    </b>
                 </td>
                 <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
                     <b>{{$item->getInventoryItemDetail->pack_size->title ?? 'Pc(s)'}}</b>
@@ -160,10 +164,18 @@ function formatNumber($number) {
                     <b>{{formatNumber($item->quantity)}}</b>
                 </td>
                 <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>x {{formatNumber($item->selling_price)}}</b>
+                    @if($item->selling_price == 0)
+                        <b style="color: #008000;">FREE</b>
+                    @else
+                        <b>x {{formatNumber($item->selling_price)}}</b>
+                    @endif
                 </td>
                 <td style="font-weight: bold; text-align: right; padding: 8px; vertical-align: top;">
-                    <b>{{formatNumber($item->total_cost_with_vat)}}</b>
+                    @if($item->selling_price == 0)
+                        <b style="color: #008000;">FREE</b>
+                    @else
+                        <b>{{formatNumber($item->total_cost_with_vat)}}</b>
+                    @endif
                 </td>
             </tr>
             

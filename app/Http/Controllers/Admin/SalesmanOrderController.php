@@ -17,6 +17,8 @@ use App\Model\WaStockMove;
 use App\SalesmanShift;
 use App\Model\WaNumerSeriesCode;
 use App\DiscountBand;
+use App\ItemPromotion;
+use App\Enums\PromotionMatrix;
 use App\Jobs\PerformPostSaleActions;
 use App\Jobs\PrepareStoreParkingList;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -350,7 +352,8 @@ class SalesmanOrderController extends Controller
                 'route'
             ])
             ->findOrFail($id);
-
+// Apply promotions to add free items
+$this->applyPromotionsToSalesmanOrder($list);
         // Increment print count for reprint tracking
         $list->increment('print_count');
 
@@ -1379,4 +1382,75 @@ class SalesmanOrderController extends Controller
                 $item->selling_price
         ]);
     }
+    /**
+ * Apply promotions to salesman order
+ */
+private function applyPromotionsToSalesmanOrder($list)
+{
+    $today = \Carbon\Carbon::today();
+    
+    // Get all items in the order
+    $orderItems = $list->getRelatedItem;
+    
+    foreach ($orderItems as $orderItem) {
+        $inventoryItem = $orderItem->getInventoryItemDetail;
+        
+        // Check for active "Buy X Get Y Free" promotions for this item
+        $promotion = ItemPromotion::where('inventory_item_id', $inventoryItem->id)
+            ->where('status', 'active')
+            ->whereNotNull('promotion_item_id')
+            ->where(function ($query) use ($today) {
+                $query->where('from_date', '<=', $today)
+                    ->where(function ($subQuery) use ($today) {
+                        $subQuery->where('to_date', '>=', $today)
+                                 ->orWhereNull('to_date');
+                    });
+            })
+            ->with(['promotionType', 'promotionItem'])
+            ->first();
+        
+        if ($promotion && $promotion->promotionType && 
+            $promotion->promotionType->description == PromotionMatrix::BSGY->value) {
+            
+            // Calculate how many free items the customer should get
+            $saleQuantity = $promotion->sale_quantity;
+            $promotionQuantity = $promotion->promotion_quantity;
+            $orderedQuantity = $orderItem->quantity;
+            
+            if ($orderedQuantity >= $saleQuantity) {
+                $freeItemsEarned = floor($orderedQuantity / $saleQuantity) * $promotionQuantity;
+                
+                if ($freeItemsEarned > 0) {
+                    // Check if free item already exists in the order
+                    $existingFreeItem = $orderItems->where('wa_inventory_item_id', $promotion->promotion_item_id)
+                                                 ->where('selling_price', 0)
+                                                 ->first();
+                    
+                    if (!$existingFreeItem) {
+                        // Create new free item entry
+                        $freeItem = new \App\Model\WaInternalRequisitionItem();
+                        $freeItem->wa_internal_requisition_id = $list->id;
+                        $freeItem->wa_inventory_item_id = $promotion->promotion_item_id;
+                        $freeItem->quantity = $freeItemsEarned;
+                        $freeItem->selling_price = 0;
+                        $freeItem->total_cost = 0;
+                        $freeItem->total_cost_with_vat = 0;
+                        $freeItem->vat_amount = 0;
+                        $freeItem->discount = 0;
+                        $freeItem->save();
+                        
+                        // Add to the collection for immediate display
+                        $list->getRelatedItem->push($freeItem);
+                    } else {
+                        // Update existing free item quantity
+                        $existingFreeItem->quantity = $freeItemsEarned;
+                        $existingFreeItem->save();
+                    }
+                    
+                    \Log::info("Promotion applied to salesman order {$list->id}: {$freeItemsEarned} free items added for promotion {$promotion->id}");
+                }
+            }
+        }
+    }
+}
 }
