@@ -1,290 +1,300 @@
-<html>
-<title>Print</title>
+@php
+    $settings = getAllSettings();
+@endphp
 
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <style type="text/css">
-        body {
-            font-family: arial, sans-serif;
-            font-size: 12px;
-            margin: 20px;
-            color: #000;
-        }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Sales Order Print</title>
 
-        table {
-            border-collapse: collapse;
+    <style>
+        body {
+            font-family: "Helvetica Neue", sans-serif;
+            font-size: 14px;
+            color: #000000;
+        }
+        #receipt-main {
+            padding: 0;
+            margin: 0;
             width: 100%;
         }
 
-        td, th {
-            text-align: left;
-            padding: 4px 8px;
-            font-weight: bold;
-        }
-
-        .center {
+        #receipt-header {
+            position: relative;
+            width: 100%;
             text-align: center;
         }
 
-        .right {
-            text-align: right;
+        #receipt-header span {
+            display: block;
+            font-size: 14px;
         }
 
-        hr {
-            border: 1px solid #000;
-            margin: 5px 0;
+        .normal {
+            display: block;
+            font-size: 14px;
         }
 
-        .customer-details {
-            line-height: 1.4;
+        .bolder {
+            display: block;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .customer-details .normal {
+            font-size: 14px;
+        }
+
+        .table {
+            width: 100%;
+            font-size: 14px;
+            border-collapse: collapse;
+        }
+
+        .table tr.heading td {
+            border-bottom: 2px dotted #000;
+            border-top: 2px dotted #000;
+            font-weight: bold;
             padding: 10px 0;
         }
 
-        .invoice-box {
-            margin: auto;
-            font-size: 12px;
-            line-height: 20px;
-            font-family: arial, sans-serif;
-            color: #000;
+        .table tr.item td {
+            padding: 8px 0;
+            border-bottom: 1px dotted #000;
         }
 
+        .table tr hr {
+            border: none;
+            border-bottom: 1px dotted #000;
+            margin: 0;
+        }
     </style>
-
 </head>
+
 <body>
 
-<?php 
-$all_settings = getAllSettings();
-$getLoggeduserProfile = getLoggeduserProfile();
-
-// Custom formatting function for quantities and prices
-function formatNumber($number) {
-    // If the number has a decimal part of .5, show 1 decimal place
-    if (fmod($number, 1) == 0.5) {
-        return number_format($number, 1);
+@php
+    // Custom formatting function for quantities and prices
+    function formatNumber($number) {
+        // If the number has a decimal part of .5, show 1 decimal place
+        if (fmod($number, 1) == 0.5) {
+            return number_format($number, 1);
+        }
+        // Otherwise, show no decimal places
+        return number_format($number, 0);
     }
-    // Otherwise, show no decimal places
-    return number_format($number, 0);
-}
-?>
-<div class="invoice-box">
-    <table style="width: 100%;">
-        <!-- Company Name & Address (centered) -->
-        <tr>
-            <td colspan="4" class="center">
-                <b style="font-size: 18px;">{{ strtoupper($all_settings['COMPANY_NAME']) }}</b>
-            </td>
-        </tr>
-        <tr>
-            <td colspan="4" class="center">
-                <b>SALES ORDER</b>
-            </td>
-        </tr>
-        <tr>
-            <td colspan="4" class="center">
-                <b>{{ $all_settings['ADDRESS_1'] }}, {{ $all_settings['ADDRESS_2'] }}</b>
-            </td>
-        </tr>
-        <tr>
-            <td colspan="4" class="center">
-                <b>Mobile: {{ $all_settings['PHONE_NUMBER'] ?? '0740804489' }}</b>
-            </td>
-        </tr>
-        
-        @if ($list->print_count > 1)
-        <tr>
-            <td colspan="4" class="center">
-                <b>REPRINT {{ $list->print_count - 1 }}</b>
-            </td>
-        </tr>
-        @endif
-        
-        <!-- Horizontal Line -->
-        <tr>
-            <td colspan="4"><hr></td>
-        </tr>
-        
-        <!-- Customer Details Section -->
-        <tr>
-            <td colspan="4" style="text-align: left; padding: 10px 0; line-height: 1.4;">
-                @php
-                    $customer = $list->getRouteCustomer;
-                    $shift = $list->shift;
-                @endphp
-                <b>Order No.: {{$list->requisition_no}}</b><br>
-                <b>Company PIN: {{$all_settings['PIN_NO'] ?? 'Https://testing.com'}}</b><br>
-                <b>Customer PIN: {{$customer->kra_pin ?? ''}}</b><br>
-                <b>Customer Name: {{$customer->bussiness_name ?? $customer->name ?? 'N/A'}}</b><br>
-                <b>Date: {{date('d/m/Y H:i', strtotime($list->created_at))}}</b><br>
-                <b>Served By: {{$list->getrelatedEmployee->name ?? 'N/A'}}</b><br>
-                <b>Customer Account: {{$customer->account_type ?? 'BUSINESS'}}</b><br>
-                <b>Mobile: {{$customer->phone ?? '0700'}}</b><br>
-                <b>B/F: KSh {{number_format($customer->balance ?? 0, 2)}}</b>
-            </td>
-        </tr>
-        
-        <!-- Horizontal Line -->
-        <tr>
-            <td colspan="4"><hr></td>
-        </tr>
-    </table>
+@endphp
 
-    <!-- Items Table -->
-    <table style="width:100%; border-collapse: collapse;">
-        <!-- Table Headers -->
-        <tr style="border-bottom: 2px solid #000;">
-            <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Item</b></td>
-            <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Unit</b></td>
-            <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Qty</b></td>
-            <td style="font-weight: bold; text-align: left; padding: 8px;"><b>Price</b></td>
-            <td style="font-weight: bold; text-align: right; padding: 8px;"><b>Amount</b></td>
+<div id="receipt-main">
+    <div id="receipt-header">
+        <div style="width:100%; text-align:center;">
+            @php
+                $generator = new \Picqer\Barcode\BarcodeGeneratorHTML();
+                $barcode = $generator->getBarcode($list->requisition_no ?? $list->id, $generator::TYPE_CODE_128);
+            @endphp
+            <div style="display: inline-block; height: 50px">
+                <div style="transform: scale(1);">
+                    {!! $barcode !!}
+                </div>
+            </div>
+            <br>
+        </div>
+
+        <h3 style="margin: 10px; padding: 0; font-size: 15px;"> {{ $settings['COMPANY_NAME'] }}</h3>
+        <span> {{ $settings['ADDRESS_2']}} {{ $settings['ADDRESS_3']}} </span>
+        <span> Tel: {{ $settings['PHONE_NUMBER']}} </span>
+        <span> Email: {{ $settings['EMAILS']}} </span>
+        <span> Website: {{ $settings['WEBSITE']}} </span>
+        <span> PIN No: {{ $settings['PIN_NO']}} </span>
+    </div>
+
+    <div style="margin-top: 20px; text-align: center;">
+        <h3 style="margin: 0; padding: 0; font-size: 15px;"> SALES ORDER</h3>
+        <span class="bolder"> Order No.: {{ $list->requisition_no ?? $list->id }} </span>
+        @if ($list->print_count > 1)
+            <span style="font-size:15px !important; font-weight: bold">REPRINT {{$list->print_count-1}}</span>
+        @endif
+        <br>
+    </div>
+
+    <div style="margin-top: 20px;" class="customer-details">
+        @php
+            $customer = $list->getRouteCustomer;
+            $shift = $list->shift;
+        @endphp
+        
+        <span class="normal"> Time: {{ $list->created_at->format('d/m/y  H:i A') }} </span>
+        <span class="normal"> Customer Name: {{ $customer->bussiness_name ?? $customer->name ?? 'N/A' }} </span>
+        <span class="normal"> Customer Number: {{ $customer->phone ?? 'N/A' }}</span>
+        @if($customer->kra_pin)
+            <span class="normal"> Customer KRA Pin: {{ $customer->kra_pin }}</span>
+        @endif
+        <span class="normal"> Served By: {{ $list->getrelatedEmployee->name ?? 'N/A' }} </span>
+        <span class="normal"> Account Balance: KSh {{ number_format($customer->balance ?? 0, 2) }} </span>
+        <br>
+        <span class="normal"> Prices are inclusive of tax where applicable. </span>
+    </div>
+    <br>
+
+    <table class="table">
+        <tbody>
+        <tr class="heading">
+            <td>Item</td>
+            <td>Qty</td>
+            <td>Price</td>
+            <td style="text-align:right">Amount</td>
         </tr>
         @php
             $TONNAGE = 0;
             $gross_amount = 0;
-            $totalDiscount = 0;
-            $netAmount = 0;
-            $totalVat = 0;
-            $totalItems = count($list->getRelatedItem);
+            $count = 0;
+            $vat_amount = 0;
+            $total_discount = 0;
+            $net_amount = 0;
         @endphp
         
-        @foreach($list->getRelatedItem as $index => $item)
-            <!-- Item Row -->
-            <tr>
-                <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>{{$index + 1}}. {{strtoupper($item->getInventoryItemDetail->title)}}
+        @foreach($list->getRelatedItem as $item)
+            <tr style="width:100%;">
+                <td colspan="4" style="text-align:left;">{{ $loop->iteration }}. {{strtoupper($item->getInventoryItemDetail->title)}}
+                @if($item->selling_price == 0)
+                    <span style="color: #008000;"> - FREE ITEM</span>
+                @endif
+                </td>
+            </tr>
+            <tr class="item">
+                <td>{{$item->getInventoryItemDetail->pack_size->title ?? 'Pc(s)'}}</td>
+                <td>{{formatNumber($item->quantity)}}</td>
+                <td>
                     @if($item->selling_price == 0)
-                        <span style="color: #008000;"> - FREE ITEM</span>
-                    @endif
-                    </b>
-                </td>
-                <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>{{$item->getInventoryItemDetail->pack_size->title ?? 'Pc(s)'}}</b>
-                </td>
-                <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    <b>{{formatNumber($item->quantity)}}</b>
-                </td>
-                <td style="font-weight: bold; text-align: left; padding: 8px; vertical-align: top;">
-                    @if($item->selling_price == 0)
-                        <b style="color: #008000;">FREE</b>
+                        <span style="color: #008000;">FREE</span>
                     @else
-                        <b>x {{formatNumber($item->selling_price)}}</b>
+                        {{number_format($item->selling_price, 2)}}
                     @endif
                 </td>
-                <td style="font-weight: bold; text-align: right; padding: 8px; vertical-align: top;">
+                <td style="text-align:right;">
                     @if($item->selling_price == 0)
-                        <b style="color: #008000;">FREE</b>
+                        <span style="color: #008000;">FREE</span>
                     @else
-                        <b>{{formatNumber($item->total_cost_with_vat)}}</b>
+                        {{number_format($item->total_cost_with_vat, 2)}}
                     @endif
                 </td>
             </tr>
-            
-            @if($index < $totalItems - 1)
-            <!-- Horizontal Line between items -->
-            <tr>
-                <td colspan="5" style="padding: 0;"><hr style="border: 1px solid #000; margin: 5px 0;"></td>
-            </tr>
-            @endif
-
             @php
+                $TONNAGE += (($item->getInventoryItemDetail->net_weight ?? 1) * $item->quantity);
                 $gross_amount += $item->total_cost_with_vat;
-                $TONNAGE += (($item->getInventoryItemDetail->net_weight ?? 0) * $item->quantity);
-                $totalDiscount += $item->discount ?? 0;
-
-                // Calculate VAT properly - VAT is already included in selling price, so extract it
+                $net_amount += (($item->total_cost_with_vat) - ($item->discount ?? 0));
+                $total_discount += $item->discount ?? 0;
+                $count++;
+                
+                // Calculate VAT properly
                 $vat = 0;
                 if ($item->getInventoryItemDetail->taxManager && $item->getInventoryItemDetail->taxManager->tax_value > 0) {
                     $taxRate = (float)$item->getInventoryItemDetail->taxManager->tax_value;
                     if ($item->getInventoryItemDetail->taxManager->tax_format === 'PERCENTAGE') {
-                        // Calculate item total (selling price * quantity - discount)
                         $itemTotal = ($item->selling_price * $item->quantity) - ($item->discount ?? 0);
-                        // VAT is already included in selling price, so extract it using the formula: VAT = (taxRate / (100 + taxRate)) * itemTotal
                         $vat = ($taxRate / (100 + $taxRate)) * $itemTotal;
                     }
                 }
-                // Use stored VAT amount if available, otherwise use calculated
                 $actualVat = $item->vat_amount ?? $vat;
-                $totalVat += $actualVat;
+                $vat_amount += $actualVat;
             @endphp
         @endforeach
+
+        <tr style="width:100%;">
+            <td colspan="4"><hr class="new4"></td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="3" style="text-align:left !important">
+                Gross Totals <br>
+                Discount <br>
+                Totals <br>
+            </td>
+            <td colspan="1" style="text-align:right !important">
+                {{ number_format($gross_amount, 2) }} <br>
+                {{ number_format($total_discount, 2) }} <br>
+                {{ number_format($net_amount, 2) }}
+            </td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="4"><hr class="new4"></td>
+        </tr>
+        <tr>
+            <td colspan="4" style="text-align:left !important">
+                {{strtoupper(getCurrencyInWords($gross_amount))}}
+            </td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="4"><hr class="new4"></td>
+        </tr>
+
+        <tr style="width:100%;">
+            <td colspan="1" style="text-align:left !important">
+                <span style="border-bottom:1px dashed">CODE</span>
+            </td>
+            <td colspan="2" style="text-align:right !important">
+                <span style="border-bottom:1px dashed">VATABLE AMT</span>
+            </td>
+            <td colspan="1" style="text-align:right !important">
+                <span style="border-bottom:1px dashed">VAT AMT</span>
+            </td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="1" style="text-align:left !important">
+                S
+            </td>
+            <td colspan="2" style="text-align:right !important">
+                {{number_format($gross_amount, 2)}}
+            </td>
+            <td colspan="1" style="text-align:right !important">
+                {{number_format($vat_amount, 2)}}
+            </td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="4"><hr class="new4"></td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="3" style="text-align:left !important">
+                Order Status<br>
+            </td>
+            <td colspan="1" style="text-align:right !important">
+                {{strtoupper($list->status)}}<br>
+            </td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="3" style="text-align:left !important">
+                Account Balance<br>
+            </td>
+            <td colspan="1" style="text-align:right !important">
+                {{ number_format($customer->balance ?? 0, 2) }}<br>
+            </td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="4"><hr class="new4"></td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="4" style="text-align:left !important">
+                You were served by: <b>{{$list->getrelatedEmployee->name ?? 'N/A'}}</b>
+                @if($shift)
+                    <br>Shift: <b>{{$shift->shift_name ?? 'N/A'}}</b>
+                @endif
+            </td>
+        </tr>
+        <tr style="width:100%;">
+            <td colspan="4"><hr class="new4"></td>
+        </tr>
+        </tbody>
     </table>
 
-    <hr>
-
-    <!-- Summary Section -->
-    <table style="width: 100%; border-collapse: collapse;">
-        <tr> 
-            <td style="text-align: left; font-weight: bold; padding: 8px; width: 70%;"><b>No of Items</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px; width: 30%;"><b>{{count($list->getRelatedItem)}}</b></td>
-        </tr>
-        <tr> 
-            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>Subtotal:</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($gross_amount - $totalVat, 2)}}</b></td>
-        </tr>
-        <tr> 
-            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>VAT</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($totalVat, 2)}}</b></td>
-        </tr>
-        <tr> 
-            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>TOTAL ORDER AMNT:</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($gross_amount, 2)}}</b></td>
-        </tr>
-        <tr> 
-            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>CURRENT DUE AMOUNT</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($gross_amount, 2)}}</b></td>
-        </tr>
-        <tr> 
-            <td style="text-align: left; font-weight: bold; padding: 8px;"><b>ACCOUNT BALANCE</b></td>
-            <td style="text-align: right; font-weight: bold; padding: 8px;"><b>KSh {{number_format($customer->balance ?? 0, 2)}}</b></td>
-        </tr>
-    </table>
-
-    <hr>
-
-    <!-- CU INFORMATION Section -->
-    <div style="width: 100%; text-align: center; margin-top: 20px;">
-        <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-                <td colspan="2" style="text-align: center; font-weight: bold; font-size: 16px; padding: 10px;">
-                    <b>ORDER INFORMATION</b>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
-                    <b>Date: {{date('d/m/Y', strtotime($list->created_at))}} Time: {{date('H:i:s A', strtotime($list->created_at))}}</b>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
-                    <b>ORDER ID: {{$list->requisition_no ?? $list->id}}</b>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
-                    <b>SALESMAN: {{$list->getrelatedEmployee->name ?? 'N/A'}}</b>
-                </td>
-            </tr>
-            @if($shift)
-            <tr>
-                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
-                    <b>SHIFT: {{$shift->shift_name ?? 'N/A'}}</b>
-                </td>
-            </tr>
-            @endif
-            <tr>
-                <td colspan="2" style="text-align: center; font-weight: bold; padding: 5px;">
-                    <b>STATUS: {{strtoupper($list->status)}}</b>
-                </td>
-            </tr>
-            <tr>
-                <td colspan="2" style="text-align: center; font-weight: bold; padding: 10px;">
-                    <b>MPESA TILL NO: 166538 NO CASH PAYMENT ON DELIVERY!</b>
-                </td>
-            </tr>
-        </table>
+    <div style="margin-top: 40px; text-align: center; font-size: 14px;">
+        <span> Thank you for your business. </span>
+        <br>
+        <span> Order ID: {{ $list->requisition_no ?? $list->id }} </span>
+        <br>
+        <span> &copy; {{ \Carbon\Carbon::now()->year }}. Effecentrix POS. </span>
     </div>
-
-
 </div>
 
 @if(!isset($is_pdf))
