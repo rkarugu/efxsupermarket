@@ -257,10 +257,10 @@
         </tr>
         <tr style="width:100%;">
             <td colspan="3" style="text-align:left !important">
-                Order Status<br>
+                Tonnage<br>
             </td>
             <td colspan="1" style="text-align:right !important">
-                {{strtoupper($list->status)}}<br>
+                {{number_format($TONNAGE, 2)}} KG<br>
             </td>
         </tr>
         <tr style="width:100%;">

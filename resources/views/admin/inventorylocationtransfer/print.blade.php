@@ -87,8 +87,8 @@
     </div>
 
     <div style="margin-top: 20px; text-align: center;">
-        <h3 style="margin: 0; padding: 0; font-size: 15px;"> TRANSFER INVOICE</h3>
-        <span class="bolder"> Transfer No.: {{ $list->transfer_no ?? $list->id }} </span>
+        <h3 style="margin: 0; padding: 0; font-size: 15px;"> CREDIT INVOICE</h3>
+        <span class="bolder"> CIV No.: {{ $list->transfer_no ?? $list->id }} </span>
         @if ($list->print_count > 1)
             <span style="font-size:15px !important; font-weight: bold">REPRINT {{$list->print_count-1}}</span>
         @endif
@@ -230,10 +230,10 @@
         </tr>
         <tr style="width:100%;">
             <td colspan="3" style="text-align:left !important">
-                Transfer Status<br>
+                Tonnage<br>
             </td>
             <td colspan="1" style="text-align:right !important">
-                {{strtoupper($list->status ?? 'ACTIVE')}}<br>
+                {{number_format($TONNAGE, 2)}} KG<br>
             </td>
         </tr>
         <tr style="width:100%;">
@@ -249,7 +249,7 @@
         </tr>
         <tr style="width:100%;">
             <td colspan="4" style="text-align:left !important">
-                You were served by: <b>{{$list->user->name ?? 'N/A'}}</b>
+                You were served by: <b>{{getLoggeduserProfile()->name ?? $list->user->name ?? 'N/A'}}</b>
             </td>
         </tr>
         <tr style="width:100%;">
@@ -261,7 +261,7 @@
     <div style="margin-top: 40px; text-align: center; font-size: 14px;">
         <span> Thank you for your business. </span>
         <br>
-        <span> Transfer No: {{ $list->transfer_no ?? $list->id }} </span>
+        <span> CIV No: {{ $list->transfer_no ?? $list->id }} </span>
         <br>
         <span> &copy; {{ \Carbon\Carbon::now()->year }}. Effecentrix POS. </span>
     </div>
