@@ -128,7 +128,7 @@
                         VAT NO:
                     </th> -->
                     <th colspan="1" style="width: 33%;text-align:left">
-                        PIN NO: P051604625B
+                        
                     </th>
                     <th colspan="1"  style="width: 33%;text-align:center">CASH SALE NO: {{$data->sales_no}}</th>
                     <th colspan="1" style="width: 33%;text-align:right">DATE: {{date('d-M-Y',strtotime($data->date))}}</th>

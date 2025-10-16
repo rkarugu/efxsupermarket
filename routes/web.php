@@ -1,5 +1,11 @@
 <?php
 
+// Include debug promotion routes
+require __DIR__.'/debug_promotion.php';
+require __DIR__.'/debug_all_promotions.php';
+require __DIR__.'/test_promotion_service.php';
+require __DIR__.'/debug_promotion_logic.php';
+
 /*
   |--------------------------------------------------------------------------
   | Web Routes
