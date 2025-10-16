@@ -136,6 +136,7 @@ class InternalRequisitionController extends Controller
 
             $lists = WaInternalRequisition::with(['getRouteCustomer', 'getrelatedEmployee', 'esd_details'])
                 ->whereIn('route_id', $routes)
+                ->where('requisition_no', 'LIKE', 'INV-%')
                 ->whereBetween('created_at', [$startDate, $endDate]);
 
             //            $esd_details = WaEsdDetails::where('invoice_number', $request->requisition_no)->first();

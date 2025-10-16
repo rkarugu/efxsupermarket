@@ -69,6 +69,7 @@ class SalesmanOrderController extends Controller
 
         // Get today's orders
         $todaysOrders = WaInternalRequisition::where('user_id', $user->id)
+            ->where('requisition_no', 'LIKE', 'SO%')
             ->whereDate('created_at', Carbon::today())
             ->with(['getRouteCustomer', 'getRelatedItem'])
             ->orderBy('created_at', 'desc')
@@ -321,6 +322,7 @@ class SalesmanOrderController extends Controller
                 'route'
             ])
             ->where('user_id', $user->id)
+            ->where('requisition_no', 'LIKE', 'SO%')
             ->findOrFail($id);
 
         $title = 'Order Details';
@@ -351,9 +353,12 @@ class SalesmanOrderController extends Controller
                 'shift',
                 'route'
             ])
+            ->where('requisition_no', 'LIKE', 'SO%')
             ->findOrFail($id);
-// Apply promotions to add free items
-$this->applyPromotionsToSalesmanOrder($list);
+            
+        // Apply promotions to add free items
+        $this->applyPromotionsToSalesmanOrder($list);
+        
         // Increment print count for reprint tracking
         $list->increment('print_count');
 
@@ -384,6 +389,7 @@ $this->applyPromotionsToSalesmanOrder($list);
                 'shift',
                 'route'
             ])
+            ->where('requisition_no', 'LIKE', 'SO%')
             ->findOrFail($id);
 
         // Increment print count for reprint tracking
