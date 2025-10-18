@@ -9,6 +9,7 @@ use App\WalletTran;
 use App\Model\Route;
 use App\Model\UserLog;
 use App\SalesmanShift;
+use App\Model\WaShift;
 use App\DeliverySchedule;
 use App\Model\WaCustomer;
 use App\OffsiteShiftRequest;
@@ -211,6 +212,15 @@ class ShiftController extends Controller
             'shift_type' => 'onsite',
             'start_time' => Carbon::now(),
         ]);
+
+        // Create corresponding WaShift record for financial data linkage
+        $waShift = new WaShift();
+        $waShift->shift_id = 'SS-' . $shift->id . '-' . date('Ymd');
+        $waShift->salesman_id = $user->id;
+        $waShift->route = $route->route_name;
+        $waShift->status = 'open';
+        $waShift->shift_date = Carbon::now()->toDateString();
+        $waShift->save();
 
         foreach ($routeCustomers as $routeCustomer) {
             $shift->shiftCustomers()->create([

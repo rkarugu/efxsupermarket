@@ -1549,7 +1549,19 @@ function getAllsalesmanLists()
 
 function getAllShiftList()
 {
-    $user_data = WaShift::orderBy('id', 'DESC')->pluck('shift_id', 'id');
+    $user_data = \App\SalesmanShift::with(['salesman', 'salesman_route'])
+        ->orderBy('id', 'DESC')
+        ->get()
+        ->mapWithKeys(function ($shift) {
+            $routeName = $shift->salesman_route ? $shift->salesman_route->route_name : 'Unknown Route';
+            $salesmanName = $shift->salesman ? $shift->salesman->name : 'Unknown Salesman';
+            $shiftDate = $shift->created_at ? $shift->created_at->format('Y-m-d') : 'Unknown Date';
+            $shiftType = ucfirst($shift->shift_type ?? 'Unknown');
+            $status = ucfirst($shift->status ?? 'Unknown');
+            
+            $label = "{$salesmanName} - {$routeName} ({$shiftDate}) - {$shiftType} - {$status}";
+            return [$shift->id => $label];
+        });
     return $user_data;
 }
 
@@ -1565,7 +1577,19 @@ function getLoadingShiftList()
 
 function getAllShiftLists()
 {
-    $user_data = WaShift::orderBy('id', 'DESC')->pluck('shift_id', 'id');
+    $user_data = \App\SalesmanShift::with(['salesman', 'salesman_route'])
+        ->orderBy('id', 'DESC')
+        ->get()
+        ->mapWithKeys(function ($shift) {
+            $routeName = $shift->salesman_route ? $shift->salesman_route->route_name : 'Unknown Route';
+            $salesmanName = $shift->salesman ? $shift->salesman->name : 'Unknown Salesman';
+            $shiftDate = $shift->created_at ? $shift->created_at->format('Y-m-d') : 'Unknown Date';
+            $shiftType = ucfirst($shift->shift_type ?? 'Unknown');
+            $status = ucfirst($shift->status ?? 'Unknown');
+            
+            $label = "{$salesmanName} - {$routeName} ({$shiftDate}) - {$shiftType} - {$status}";
+            return [$shift->id => $label];
+        });
     return $user_data;
 }
 

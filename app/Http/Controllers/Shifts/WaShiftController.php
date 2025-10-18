@@ -110,7 +110,7 @@ class WaShiftController extends Controller
                         ->whereDate('created_at', '=', Carbon::now()->toDateString())
                         ->first();
                     if ($salesmanHadARouteShiftToday) {
-                        $shiftType = $salesmanHadARouteShiftToday->shift_type == 'onsite' ? 'on-site' : 'off-site';
+                        $shiftType = $salesmanHadARouteShiftToday->shift_type == 'onsite' ? 'onsite' : 'offsite';
                         return $this->jsonify([
                             'message' => "Sorry, you already have an $shiftType shift for this route today. Please request for it to be re-opened.",
                             'status' => false,

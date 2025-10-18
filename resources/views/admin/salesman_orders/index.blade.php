@@ -233,9 +233,8 @@
                             <label>Shift Type</label>
                             <select name="shift_type" class="form-control" required>
                                 <option value="">Select Shift Type</option>
-                                <option value="regular">Regular</option>
-                                <option value="emergency">Emergency</option>
-                                <option value="overtime">Overtime</option>
+                                <option value="onsite">Onsite</option>
+                                <option value="offsite">Offsite</option>
                             </select>
                         </div>
                     </form>

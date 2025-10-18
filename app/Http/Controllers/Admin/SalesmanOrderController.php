@@ -15,6 +15,7 @@ use App\Model\WaUnitOfMeasure;
 use App\Model\DeliveryCentres;
 use App\Model\WaStockMove;
 use App\SalesmanShift;
+use App\Model\WaShift;
 use App\Model\WaNumerSeriesCode;
 use App\DiscountBand;
 use App\ItemPromotion;
@@ -759,6 +760,15 @@ class SalesmanOrderController extends Controller
             $shift->start_time = Carbon::now();
             $shift->status = 'open';
             $shift->save();
+
+            // Create corresponding WaShift record for financial data linkage
+            $waShift = new WaShift();
+            $waShift->shift_id = 'SS-' . $shift->id . '-' . date('Ymd');
+            $waShift->salesman_id = $user->id;
+            $waShift->route = $userRoute ? $userRoute->route_name : null;
+            $waShift->status = 'open';
+            $waShift->shift_date = Carbon::now()->toDateString();
+            $waShift->save();
 
             return response()->json([
                 'success' => true, 
