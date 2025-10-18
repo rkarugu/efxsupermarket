@@ -3415,6 +3415,7 @@ Route::group(['prefix' => 'admin', 'middleware' => ['AdminLoggedIn', 'ip-blocker
         Route::get('/create', [SalesmanOrderController::class, 'create'])->name('create');
         Route::post('/store', [SalesmanOrderController::class, 'store'])->name('store');
         Route::get('/ajax/route-customers', [SalesmanOrderController::class, 'getRouteCustomers'])->name('ajax.route-customers');
+        Route::get('/ajax/search-customers', [SalesmanOrderController::class, 'searchCustomers'])->name('search-customers');
         Route::get('/ajax/item-details', [SalesmanOrderController::class, 'getItemDetails'])->name('ajax.item-details');
         Route::get('/search-inventory', [SalesmanOrderController::class, 'searchInventory'])->name('search-inventory');
         Route::get('/get-item-details', [SalesmanOrderController::class, 'getItemDetails'])->name('get-item-details');

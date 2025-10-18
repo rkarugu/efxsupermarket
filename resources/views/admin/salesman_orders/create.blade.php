@@ -1,6 +1,48 @@
 @extends('layouts.admin.admin')
 
 @section('content')
+<!-- Select2 CSS -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+<style>
+/* Custom styling for Select2 customer results */
+.select2-result-customer {
+    padding: 5px 0;
+}
+
+.select2-result-customer__meta {
+    margin-left: 0;
+}
+
+.select2-result-customer__title {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 3px;
+}
+
+.select2-result-customer__description {
+    font-size: 12px;
+    color: #666;
+}
+
+.select2-container--default .select2-results__option--highlighted[aria-selected] .select2-result-customer__title {
+    color: #fff;
+}
+
+.select2-container--default .select2-results__option--highlighted[aria-selected] .select2-result-customer__description {
+    color: #f0f0f0;
+}
+
+/* Make Select2 dropdown wider for better readability */
+.select2-container {
+    width: 100% !important;
+}
+
+.select2-dropdown {
+    min-width: 400px;
+}
+</style>
+
 <section class="content">
     <div class="session-message-container">
         @include('message')
@@ -57,16 +99,10 @@
                     <div class="col-md-12">
                         <div class="form-group">
                             <label>Select Customer <span class="text-red">*</span></label>
-                            <select name="wa_route_customer_id" id="customerSelect" class="form-control select2" required>
-                                <option value="">Choose Customer</option>
-                                @foreach($routeCustomers as $customer)
-                                    <option value="{{ $customer->id }}" 
-                                            data-phone="{{ $customer->phone }}" 
-                                            data-town="{{ $customer->town }}">
-                                        {{ $customer->bussiness_name }} - {{ $customer->name }}
-                                    </option>
-                                @endforeach
+                            <select name="wa_route_customer_id" id="customerSelect" class="form-control" required>
+                                <option value="">Search for a customer...</option>
                             </select>
+                            <small class="text-muted">Start typing to search by customer name, business name, or phone number</small>
                         </div>
                     </div>
                 </div>
@@ -99,11 +135,6 @@
                 <button type="button" class="btn btn-success btn-sm Newrow" 
                         style="position: fixed;bottom: 30%;right:4%;">
                     <i class="fa fa-plus" aria-hidden="true"></i> Add Item
-                </button>
-                <button type="button" class="btn btn-info btn-sm" id="testSearchBtn"
-                        style="position: fixed;bottom: 35%;right:4%;"
-                        onclick="testSearchFunction()">
-                    Test Search
                 </button>
                 <div class="table-responsive">
                     <table class="table table-bordered table-hover" id="mainItemTable">
@@ -168,19 +199,10 @@
     </form>
 </section>
 
-
 <script>
-// Try jQuery first, fallback to vanilla JavaScript
+// Initialize vanilla JavaScript functionality for item search
 if (typeof $ !== 'undefined') {
     $(document).ready(function() {
-        console.log('Document ready - jQuery loaded:', typeof $);
-        console.log('Test button exists:', $('#testSearchBtn').length);
-        console.log('Search input exists:', $('.testIn').length);
-        console.log('Search input element:', $('.testIn')[0]);
-        
-        // Initialize Select2
-        $('.select2').select2();
-        
         // Setup vanilla JavaScript functionality
         initializeAllSearchInputs();
         setupCustomerHandler();
@@ -432,34 +454,6 @@ function submitOrder() {
     });
 }
 
-// Global test function for onclick (vanilla JavaScript)
-function testSearchFunction() {
-    alert('Direct onclick test button clicked!');
-    console.log('Direct onclick - Testing search route...');
-    
-    fetch("{{ route('salesman-orders.test-search') }}", {
-        method: 'GET',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok: ' + response.status);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Direct test successful:', data);
-        alert('Direct test successful: ' + (data.message || 'Test completed'));
-    })
-    .catch(error => {
-        console.error('Direct test failed:', error);
-        alert('Direct test failed: ' + error.message);
-    });
-}
-
 // Initialize all search inputs on page load
 function initializeAllSearchInputs() {
     const searchInputs = document.querySelectorAll('.testIn');
@@ -508,7 +502,7 @@ function addItemToCart(itemId, itemName, unitName, availableStock, sellingPrice)
         <td class="available-stock">${availableStock}</td>
         <td>${unitName}</td>
         <td><input type="number" name="items[${itemId}][quantity]" class="form-control quantity" min="1" max="${availableStock}" value="1"></td>
-        <td><input type="number" name="items[${itemId}][selling_price]" class="form-control selling_price" step="0.01" value="${sellingPrice}"></td>
+        <td><input type="number" name="items[${itemId}][selling_price]" class="form-control selling_price" value="${sellingPrice}"></td>
         <td class="total-cost">0.00</td>
         <td><button type="button" class="btn btn-danger btn-sm remove-item">Remove</button></td>
     `;
@@ -679,4 +673,153 @@ function checkDiscountBand(itemId, quantity, row) {
     position: relative;
 }
 </style>
+
+@endsection
+
+@section('uniquepagescript')
+<!-- Select2 JS - Load in script section -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+console.log('=== UNIQUE PAGE SCRIPT SECTION LOADED ===');
+console.log('jQuery available:', typeof $ !== 'undefined');
+console.log('Select2 available:', typeof $.fn.select2 !== 'undefined');
+
+// Wait for everything to be ready
+$(document).ready(function() {
+    console.log('=== SELECT2 INITIALIZATION DEBUG ===');
+    console.log('Document ready - jQuery loaded:', typeof $);
+    console.log('jQuery version:', $.fn.jquery);
+    console.log('Select2 available:', typeof $.fn.select2 !== 'undefined');
+    console.log('Customer select element exists:', $('#customerSelect').length);
+    console.log('Customer select element:', $('#customerSelect')[0]);
+    
+    // Check if Select2 is available
+    if (typeof $.fn.select2 === 'undefined') {
+        console.error('Select2 is not loaded!');
+        alert('Select2 library is not loaded. Customer search will not work.');
+        return;
+    }
+    
+    // Check if customer select exists
+    if ($('#customerSelect').length === 0) {
+        console.error('Customer select element not found!');
+        return;
+    }
+    
+    console.log('Initializing Select2 on #customerSelect...');
+    
+    // Format customer display in dropdown - MUST BE DEFINED BEFORE SELECT2 INIT
+    function formatCustomer(customer) {
+        if (customer.loading) {
+            return customer.text;
+        }
+        
+        var $container = $(
+            "<div class='select2-result-customer clearfix'>" +
+                "<div class='select2-result-customer__meta'>" +
+                    "<div class='select2-result-customer__title'></div>" +
+                    "<div class='select2-result-customer__description'></div>" +
+                "</div>" +
+            "</div>"
+        );
+        
+        $container.find(".select2-result-customer__title").text(customer.text);
+        
+        var description = '';
+        if (customer.phone) {
+            description += 'Phone: ' + customer.phone;
+        }
+        if (customer.town) {
+            description += (description ? ' | ' : '') + 'Town: ' + customer.town;
+        }
+        
+        if (description) {
+            $container.find(".select2-result-customer__description").text(description);
+        }
+        
+        return $container;
+    }
+
+    // Format selected customer - MUST BE DEFINED BEFORE SELECT2 INIT
+    function formatCustomerSelection(customer) {
+        return customer.text || customer.bussiness_name;
+    }
+    
+    // Initialize Select2 with AJAX search for customer dropdown
+    $('#customerSelect').select2({
+        ajax: {
+            url: '{{ route("salesman-orders.search-customers") }}',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                console.log('Select2 AJAX - Search term:', params.term);
+                return {
+                    q: params.term, // search term
+                    page: params.page || 1
+                };
+            },
+            processResults: function (data, params) {
+                console.log('Select2 AJAX - Response data:', data);
+                params.page = params.page || 1;
+                return {
+                    results: data.results,
+                    pagination: {
+                        more: data.pagination.more
+                    }
+                };
+            },
+            error: function(xhr, status, error) {
+                console.error('Select2 AJAX Error:', error);
+                console.error('Status:', status);
+                console.error('Response:', xhr.responseText);
+            },
+            cache: true
+        },
+        placeholder: 'Search for a customer...',
+        minimumInputLength: 0,
+        allowClear: true,
+        templateResult: formatCustomer,
+        templateSelection: formatCustomerSelection,
+        language: {
+            searching: function() {
+                return "Searching customers...";
+            },
+            noResults: function() {
+                return "No customers found";
+            },
+            errorLoading: function() {
+                return "Error loading customers";
+            }
+        }
+    });
+    
+    console.log('✓ Select2 successfully initialized on #customerSelect');
+    console.log('Select2 instance:', $('#customerSelect').data('select2'));
+    console.log('=== END SELECT2 INITIALIZATION ===');
+
+    // Handle customer selection change
+    $('#customerSelect').on('select2:select', function (e) {
+        var data = e.params.data;
+        var customerInfo = '';
+        
+        if (data.phone) {
+            customerInfo += 'Phone: ' + data.phone;
+        }
+        if (data.town) {
+            customerInfo += (customerInfo ? ', ' : '') + 'Town: ' + data.town;
+        }
+        
+        if (customerInfo) {
+            $('#customerInfo').text(customerInfo);
+            $('#customerDetails').show();
+        }
+    });
+
+    // Handle customer deselection
+    $('#customerSelect').on('select2:clear', function (e) {
+        $('#customerDetails').hide();
+    });
+});
+</script>
 @endsection

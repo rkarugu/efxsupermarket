@@ -617,6 +617,67 @@ class SalesmanOrderController extends Controller
     }
 
     /**
+     * Search customers for Select2 AJAX
+     */
+    public function searchCustomers(Request $request)
+    {
+        $user = Auth::user();
+        $search = $request->get('q', '');
+        $page = $request->get('page', 1);
+        $perPage = 30;
+        
+        // Get user's route
+        $userRoute = $user->routes()->first();
+        if (!$userRoute) {
+            return response()->json([
+                'results' => [],
+                'pagination' => ['more' => false]
+            ]);
+        }
+
+        // Build query
+        $query = WaRouteCustomer::where('route_id', $userRoute->id)
+            ->where('status', 'approved')
+            ->whereNull('deleted_at');
+
+        // Apply search filter
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('bussiness_name', 'LIKE', '%' . $search . '%')
+                  ->orWhere('name', 'LIKE', '%' . $search . '%')
+                  ->orWhere('phone', 'LIKE', '%' . $search . '%');
+            });
+        }
+
+        // Get total count for pagination
+        $total = $query->count();
+        
+        // Get paginated results
+        $customers = $query->select('id', 'bussiness_name', 'name', 'phone', 'town')
+            ->orderBy('bussiness_name')
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get();
+
+        // Format results for Select2
+        $results = $customers->map(function($customer) {
+            return [
+                'id' => $customer->id,
+                'text' => $customer->bussiness_name . ' - ' . $customer->name,
+                'phone' => $customer->phone,
+                'town' => $customer->town
+            ];
+        });
+
+        return response()->json([
+            'results' => $results,
+            'pagination' => [
+                'more' => ($page * $perPage) < $total
+            ]
+        ]);
+    }
+
+    /**
      * Search inventory items for AJAX (POS-style)
      */
     public function searchItems(Request $request)
