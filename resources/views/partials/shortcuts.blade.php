@@ -16,10 +16,19 @@
     let total_tendered = 0;
     let allowance = 0;
 
-    var total = $('#total_total').html()
-    if ((parseFloat(total)) === 0 ) {
-        $('#continuePayment').attr('disabled', true);
-    }
+    // Wait for jQuery and DOM to be ready
+    $(document).ready(function() {
+        var total = $('#total_total').html()
+        if ((parseFloat(total)) === 0 ) {
+            $('#continuePayment').attr('disabled', true);
+        }
+        
+        // Attach event handler
+        $('#route_customer').on('change', function() {
+            checkButtonState();
+        });
+    });
+
     function load_customer() {
         $('#loader-on').show();
         url = "{{route('pos.route_customer.create')}}";
@@ -42,10 +51,6 @@
         });
 
     }
-
-    $('#route_customer').on('change', function() {
-        checkButtonState();
-    });
 
     function checkButtonState() {
         var total = $('#total_total').html();
@@ -128,48 +133,46 @@
 
     }
 
+    var form; // Declare form variable at top level
+    
     $(document).ready(function () {
        allowance =  @json($selling_allowance);
         let amount = $('#total_total').text();
         $('#top_total').text(amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
 
-    });
-
-    $(document).on('keypress', ".quantity", function (event) {
-        if (event.keyCode === 13) {
-            event.preventDefault();
-            $(".Newrow").click();
-        }
-    });
-    $(document).on('keypress', ".start_process", function (event) {
-        if (event.keyCode === 13) {
-            event.preventDefault();
-            $(".processIt").click();
-        }
-    });
-
-    function makemefocus() {
-        // console.log($(".makemefocus"),'lll')
-        if ($(".makemefocus")[0]) {
-            add
-            $(".makemefocus")[0].focus();
-        }
-    }
-
-    $(document).on('keypress', '.customer_name_enter', function (event) {
-        if (event.keyCode === 13) {
-            event.preventDefault();
-            makemefocus();
-        }
-    });
-    $(document).on('keypress change', '.send_me_to_next_item', function (event) {
-        if (event.keyCode === 13) {
-            event.preventDefault();
-            makemefocus();
-        }
-    });
-    var form = new Form();
-    $(document).on('click', '.btnUploadData', function (e) {
+        // Initialize form object
+        form = new Form();
+        
+        // Attach all event handlers after DOM is ready
+        $(document).on('keypress', ".quantity", function (event) {
+            if (event.keyCode === 13) {
+                event.preventDefault();
+                $(".Newrow").click();
+            }
+        });
+        
+        $(document).on('keypress', ".start_process", function (event) {
+            if (event.keyCode === 13) {
+                event.preventDefault();
+                $(".processIt").click();
+            }
+        });
+        
+        $(document).on('keypress', '.customer_name_enter', function (event) {
+            if (event.keyCode === 13) {
+                event.preventDefault();
+                makemefocus();
+            }
+        });
+        
+        $(document).on('keypress change', '.send_me_to_next_item', function (event) {
+            if (event.keyCode === 13) {
+                event.preventDefault();
+                makemefocus();
+            }
+        });
+        
+        $(document).on('click', '.btnUploadData', function (e) {
         e.preventDefault();
         $('#loader-on').show();
         var postData = new FormData();
@@ -196,11 +199,12 @@
                 }
             }
         });
-    });
-    $(document).on('click', '.addExpense', function (e) {
-        e.preventDefault();
+        });
+        
+        $(document).on('click', '.addExpense', function (e) {
+            e.preventDefault();
 
-        var errorDisplayed = false;
+            var errorDisplayed = false;
         var $amountInputs = $('.amount');
         var $referenceInputs = $('.reference');
         $amountInputs.each(function(index) {
@@ -230,7 +234,16 @@
         const request_type = e.target.value;
         processSale(request_type)
 
-    });
+        });
+        
+    }); // End of $(document).ready()
+    
+    function makemefocus() {
+        // console.log($(".makemefocus"),'lll')
+        if ($(".makemefocus")[0]) {
+            $(".makemefocus")[0].focus();
+        }
+    }
 
     function processSale(request_type) {
         var $button = $('#process');
