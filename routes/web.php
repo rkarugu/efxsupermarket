@@ -855,6 +855,14 @@ Route::any('/admin/pos/route-customer/store', [CustomerController::class, 'store
     Route::POST('pos-cash-sales/esd_upload', 'PosCashSalesController@esd_upload')->name('pos-cash-sales.esd_upload');
     Route::POST('pos-cash-sales/verify/return/otp', 'PosCashSalesController@verifyOTP')->name('pos-cash-sales.verify-return.otp');
 
+    Route::get('pos-cash-sales/supermarket', 'PosCashSalesController@supermarketCreate')->name('pos-cash-sales.supermarket');
+    Route::get('pos-cash-sales/supermarket/products', 'PosCashSalesController@getSupermarketProducts')->name('pos-cash-sales.supermarket.products');
+    Route::post('pos-cash-sales/supermarket/store', 'PosCashSalesController@storeSupermarketSale')->name('pos-cash-sales.supermarket.store');
+    Route::post('pos-cash-sales/supermarket/cash-drop', 'PosCashSalesController@storeCashDrop')->name('pos-cash-sales.supermarket.cash-drop');
+    Route::get('pos-cash-sales/supermarket/cashier-info', 'PosCashSalesController@getCashierInfo')->name('pos-cash-sales.supermarket.cashier-info');
+    Route::get('pos-cash-sales/supermarket/receipt/{id}', 'PosCashSalesController@printSupermarketReceipt')->name('pos-cash-sales.supermarket.receipt');
+    Route::get('pos-cash-sales/supermarket/completed', 'PosCashSalesController@getCompletedSales')->name('pos-cash-sales.supermarket.completed');
+
     Route::resource('pos-cash-sales', 'PosCashSalesController')->middleware('branch-close');
 
 

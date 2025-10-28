@@ -2376,4 +2376,541 @@ class PosCashSalesController extends Controller
             ]);
         }
     }
+
+    public function supermarketCreate()
+    {
+        $permission = $this->mypermissionsforAModule();
+        $pmodule = $this->pmodule;
+        $title = $this->title;
+        $model = $this->model;
+
+        if (isset($permission[$pmodule . '___add']) || $permission == 'superadmin') {
+            $breadcum = [$title => route($model . '.index'), 'Create' => ''];
+            
+            // Get payment methods
+            $paymentMethod = PaymentMethod::where('use_in_pos', 1)->get();
+            
+            return view('admin.pos_cash_sales.supermarket_create', compact(
+                'title',
+                'model',
+                'pmodule',
+                'permission',
+                'breadcum',
+                'paymentMethod'
+            ));
+        }
+
+        return redirect()->back()->with('error', 'You do not have permission to access this page');
+    }
+
+    public function getSupermarketProducts(Request $request)
+    {
+        $user = Auth::user();
+        $storeId = $user->wa_location_and_store_id;
+        
+        // Get products with stock using optimized eager loading
+        $products = WaInventoryItem::select([
+            'wa_inventory_items.id',
+            'wa_inventory_items.title as name',
+            'wa_inventory_items.stock_id_code',
+            'wa_inventory_items.selling_price as price',
+            'wa_inventory_items.wa_inventory_category_id',
+            'wa_inventory_items.tax_manager_id',
+            'wa_inventory_items.image',
+            DB::raw('COALESCE((SELECT SUM(wa_stock_moves.qauntity) FROM wa_stock_moves WHERE wa_stock_moves.wa_inventory_item_id = wa_inventory_items.id AND wa_stock_moves.wa_location_and_store_id = ' . $storeId . '), 0) as stock')
+        ])
+        ->with([
+            'category:id,category_description',
+            'taxManager:id,tax_value',
+            'promotions' => function($query) {
+                $query->select('item_promotions.*')
+                      ->where('status', 'active')
+                      ->where('from_date', '<=', now())
+                      ->where(function($q) {
+                          $q->where('to_date', '>=', now())
+                            ->orWhereNull('to_date');
+                      });
+            }
+        ])
+        ->where('wa_inventory_items.status', true)
+        ->havingRaw('stock > 0')
+        ->orderBy('wa_inventory_items.title')
+        ->get()
+        ->map(function($item) {
+            // Get category name
+            $category = $item->category->category_description ?? 'general';
+            
+            // Get VAT percentage
+            $vatPercentage = 16.0;
+            if ($item->taxManager && $item->taxManager->tax_value !== null) {
+                $vatPercentage = (float) $item->taxManager->tax_value;
+            }
+            
+            // Check for active promotions
+            $promotionData = null;
+            $hasPromotion = false;
+            
+            if ($item->promotions && $item->promotions->count() > 0) {
+                $promotion = $item->promotions->first();
+                $hasPromotion = true;
+                
+                if ($promotion->promotion_type_id == 1) {
+                    $promotionData = [
+                        'type' => 'price_discount',
+                        'original_price' => (float) $promotion->current_price,
+                        'promotion_price' => (float) $promotion->promotion_price,
+                        'discount_amount' => (float) ($promotion->current_price - $promotion->promotion_price),
+                        'discount_percentage' => (float) $promotion->discount_percentage,
+                    ];
+                } elseif ($promotion->promotion_type_id == 2) {
+                    $promotionData = [
+                        'type' => 'buy_x_get_y',
+                        'buy_quantity' => (int) $promotion->sale_quantity,
+                        'get_quantity' => (int) $promotion->promotion_quantity,
+                        'free_item_id' => (int) $promotion->promotion_item_id,
+                    ];
+                }
+            }
+            
+            return [
+                'id' => $item->id,
+                'name' => $item->name,
+                'barcode' => $item->stock_id_code ?? '',
+                'price' => (float) $item->price,
+                'stock' => (int) $item->stock,
+                'category' => $category,
+                'image' => $item->image ? '/uploads/inventory_items/' . $item->image : '/assets/images/users/0.jpg',
+                'vat' => $vatPercentage,
+                'vat_inclusive' => $vatPercentage > 0,
+                'has_promotion' => $hasPromotion,
+                'promotion' => $promotionData
+            ];
+        })
+        ->values();
+
+        return response()->json($products);
+    }
+
+    /**
+     * Store supermarket POS sale with comprehensive stock tracking
+     */
+    public function storeSupermarketSale(Request $request)
+    {
+        DB::beginTransaction();
+        try {
+            $user = Auth::user();
+            $storeId = $user->wa_location_and_store_id;
+            
+            // Validate request
+            $validated = $request->validate([
+                'cart' => 'required|array|min:1',
+                'cart.*.id' => 'required|integer|exists:wa_inventory_items,id',
+                'cart.*.quantity' => 'required|numeric|min:0.01',
+                'cart.*.price' => 'required|numeric|min:0',
+                'cart.*.discount' => 'nullable|numeric|min:0|max:100',
+                'payments' => 'required|array|min:1',
+                'payments.*.method' => 'required|string',
+                'payments.*.amount' => 'required|numeric|min:0',
+                'customer' => 'nullable|array',
+            ]);
+
+            // Generate sales number
+            $salesNo = $this->generateSalesNumber();
+            
+            // Calculate totals (Prices are VAT INCLUSIVE)
+            $subtotal = 0;
+            $totalDiscount = 0;
+            $totalVat = 0;
+            
+            foreach ($validated['cart'] as $item) {
+                // Get product to check VAT rate
+                $product = WaInventoryItem::with('taxManager')->find($item['id']);
+                $vatPercentage = 16.0; // Default
+                if ($product && $product->taxManager && $product->taxManager->tax_value !== null) {
+                    $vatPercentage = (float) $product->taxManager->tax_value;
+                }
+                
+                $itemTotal = $item['price'] * $item['quantity']; // VAT inclusive price
+                $discountAmount = ($itemTotal * ($item['discount'] ?? 0)) / 100;
+                $totalAfterDiscount = $itemTotal - $discountAmount;
+                
+                // Extract VAT from VAT-inclusive price (only if VAT > 0)
+                // VAT = Total × (VAT% / (100 + VAT%))
+                $vatAmount = 0;
+                if ($vatPercentage > 0) {
+                    $vatAmount = $totalAfterDiscount * ($vatPercentage / (100 + $vatPercentage));
+                }
+                
+                $subtotal += $itemTotal;
+                $totalDiscount += $discountAmount;
+                $totalVat += $vatAmount;
+            }
+            
+            // Grand total is subtotal minus discount (VAT already included in prices)
+            $grandTotal = $subtotal - $totalDiscount;
+            
+            // Calculate total tendered
+            $totalTendered = array_sum(array_column($validated['payments'], 'amount'));
+            $change = $totalTendered - $grandTotal;
+            
+            // Create POS Cash Sale
+            $sale = WaPosCashSales::create([
+                'sales_no' => $salesNo,
+                'date' => now()->toDateString(),
+                'time' => now()->toTimeString(),
+                'user_id' => $user->id,
+                'attending_cashier' => $user->id,
+                'customer' => $validated['customer']['name'] ?? 'Walk-in Customer',
+                'customer_phone_number' => $validated['customer']['phone'] ?? null,
+                'cash' => $totalTendered,
+                'change' => $change > 0 ? $change : 0,
+                'status' => 'Completed',
+                'branch_id' => $user->restaurant_id,
+                'is_tablet_sale' => false,
+            ]);
+
+            // Create sale items and stock moves
+            foreach ($validated['cart'] as $cartItem) {
+                $product = WaInventoryItem::with(['taxManager'])->find($cartItem['id']);
+                
+                // TODO: Enable bin location validation later
+                // // Validate product has bin location for this store
+                // $hasBinLocation = $product->bin_locations()
+                //     ->where('location_id', $storeId)
+                //     ->exists();
+                // 
+                // if (!$hasBinLocation) {
+                //     throw new \Exception("Item '{$product->title}' cannot be sold - no bin location assigned.");
+                // }
+                
+                // Get item-specific VAT percentage
+                $vatPercentage = 16.0; // Default
+                if ($product && $product->taxManager && $product->taxManager->tax_value !== null) {
+                    $vatPercentage = (float) $product->taxManager->tax_value;
+                }
+                
+                $itemTotal = $cartItem['price'] * $cartItem['quantity']; // VAT inclusive
+                $discountPercent = $cartItem['discount'] ?? 0;
+                $discountAmount = ($itemTotal * $discountPercent) / 100;
+                $totalAfterDiscount = $itemTotal - $discountAmount;
+                
+                // Extract VAT from VAT-inclusive price (only if VAT > 0)
+                // VAT = Total × (VAT% / (100 + VAT%))
+                $vatAmount = 0;
+                if ($vatPercentage > 0) {
+                    $vatAmount = $totalAfterDiscount * ($vatPercentage / (100 + $vatPercentage));
+                }
+                
+                // Create sale item
+                $saleItem = WaPosCashSalesItems::create([
+                    'wa_pos_cash_sales_id' => $sale->id,
+                    'wa_inventory_item_id' => $product->id,
+                    'qty' => $cartItem['quantity'],
+                    'selling_price' => $cartItem['price'],
+                    'vat_percentage' => $vatPercentage, // Item-specific VAT
+                    'vat_amount' => $vatAmount,
+                    'discount_percent' => $discountPercent,
+                    'discount_amount' => $discountAmount,
+                    'total' => $totalAfterDiscount, // Total already includes VAT
+                    'standard_cost' => $product->standard_cost ?? 0,
+                    'tax_manager_id' => $product->tax_manager_id, // Store tax manager reference
+                    'is_dispatched' => true,
+                    'dispatched_by' => $user->id,
+                    'dispatched_time' => now(),
+                ]);
+
+                // Create stock move (deduction)
+                WaStockMove::create([
+                    'user_id' => $user->id,
+                    'wa_pos_cash_sales_id' => $sale->id,
+                    'restaurant_id' => $user->restaurant_id,
+                    'wa_location_and_store_id' => $storeId,
+                    'wa_inventory_item_id' => $product->id,
+                    'stock_id_code' => $product->stock_id_code,
+                    'refrence' => 'POS Sale: ' . $salesNo,
+                    'qauntity' => -$cartItem['quantity'], // Negative for deduction
+                    'price' => $cartItem['price'],
+                    'discount_percent' => $discountPercent,
+                    'standard_cost' => $product->standard_cost ?? 0,
+                    'selling_price' => $cartItem['price'],
+                    'document_no' => $salesNo,
+                    'total_cost' => $cartItem['price'] * $cartItem['quantity'],
+                ]);
+            }
+
+            // Create payment records
+            foreach ($validated['payments'] as $payment) {
+                $paymentMethod = PaymentMethod::where('title', $payment['method'])->first();
+                
+                WaPosCashSalesPayments::create([
+                    'wa_pos_cash_sales_id' => $sale->id,
+                    'payment_method_id' => $paymentMethod->id ?? null,
+                    'amount' => $payment['amount'],
+                    'payment_reference' => $payment['reference'] ?? null,
+                    'cashier_id' => $user->id,
+                    'branch_id' => $user->restaurant_id,
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sale completed successfully',
+                'sale_id' => $sale->id,
+                'sales_no' => $salesNo,
+                'total' => $grandTotal,
+                'change' => $change > 0 ? $change : 0,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Supermarket POS Sale Error: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error completing sale: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Record cash drop transaction
+     */
+    public function storeCashDrop(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'amount' => 'required|numeric|min:0.01',
+                'notes' => 'nullable|string',
+            ]);
+
+            $user = Auth::user();
+            $cashAtHand = $user->cashAtHand();
+
+            $cashDrop = CashDropTransaction::create([
+                'amount' => $validated['amount'],
+                'cashier_balance' => $cashAtHand - $validated['amount'],
+                'user_id' => $user->id,
+                'cashier_id' => $user->id,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Cash drop recorded successfully',
+                'drop_id' => $cashDrop->id,
+                'new_balance' => $cashAtHand - $validated['amount'],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Cash Drop Error: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error recording cash drop: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get cashier's current balance and drop information
+     */
+    public function getCashierInfo(Request $request)
+    {
+        $user = Auth::user();
+        $cashAtHand = $user->cashAtHand();
+        $dropLimit = $user->drop_limit ?? 100000;
+        
+        $todayDrops = CashDropTransaction::whereDate('created_at', today())
+            ->where('cashier_id', $user->id)
+            ->get();
+        
+        $totalDrops = $todayDrops->sum('amount');
+        $unbankedDrops = $todayDrops->whereNull('bank_receipt_number')->count();
+        
+        return response()->json([
+            'success' => true,
+            'cash_at_hand' => $cashAtHand,
+            'drop_limit' => $dropLimit,
+            'total_drops_today' => $totalDrops,
+            'unbanked_drops' => $unbankedDrops,
+            'needs_drop' => $cashAtHand >= $dropLimit,
+            'drop_percentage' => $dropLimit > 0 ? ($cashAtHand / $dropLimit) * 100 : 0,
+        ]);
+    }
+
+    /**
+     * Generate unique sales number
+     */
+    private function generateSalesNumber()
+    {
+        $prefix = 'CS';
+        $date = now()->format('Ymd');
+        $lastSale = WaPosCashSales::whereDate('created_at', today())
+            ->orderBy('id', 'desc')
+            ->first();
+        
+        $sequence = $lastSale ? (intval(substr($lastSale->sales_no, -4)) + 1) : 1;
+        
+        return $prefix . $date . str_pad($sequence, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Print receipt for supermarket POS sale
+     */
+    public function printSupermarketReceipt($id)
+    {
+        try {
+            // Optimized: Load only what we need
+            $data = WaPosCashSales::select([
+                'id', 'sales_no', 'date', 'time', 'customer', 'customer_phone_number',
+                'cash', 'change', 'status', 'print_count', 'attending_cashier', 
+                'user_id', 'created_at', 'updated_at'
+            ])
+            ->with([
+                'items' => function($query) {
+                    $query->select([
+                        'id', 'wa_pos_cash_sales_id', 'wa_inventory_item_id', 'qty',
+                        'selling_price', 'discount_percent', 'discount_amount', 
+                        'vat_percentage', 'vat_amount', 'total'
+                    ]);
+                },
+                'items.item:id,title,description,pack_size_id',
+                'items.item.pack_size:id,title',
+                'attendingCashier:id,name',
+                'user:id,name'
+            ])
+            ->find($id);
+
+            if (!$data) {
+                return back()->with('error', 'Sale not found.');
+            }
+
+            // Get payment details efficiently
+            $payments = DB::table('wa_pos_cash_sales_payments')
+                ->select(
+                    'wa_pos_cash_sales_payments.amount',
+                    'payment_methods.title',
+                    'payment_methods.is_cash',
+                    'payment_providers.slug as payment_slug'
+                )
+                ->leftJoin('payment_methods', 'payment_methods.id', '=', 'wa_pos_cash_sales_payments.payment_method_id')
+                ->leftJoin('payment_providers', 'payment_providers.id', '=', 'payment_methods.payment_provider_id')
+                ->where('wa_pos_cash_sales_id', $data->id)
+                ->get();
+
+            // Update print count
+            DB::table('wa_pos_cash_sales')
+                ->where('id', $id)
+                ->increment('print_count');
+            
+            $data->print_count = $data->print_count + 1;
+
+            return view('admin.pos_cash_sales.supermarket_receipt', [
+                'data' => $data,
+                'payments' => $payments,
+                'esd_details' => null,
+                'title' => 'Supermarket POS Receipt',
+                'model' => 'pos-cash-sales',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Supermarket Receipt Print Error: ' . $e->getMessage() . ' - Sale ID: ' . $id);
+            return back()->with('error', 'Failed to generate receipt: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get completed sales for supermarket POS
+     */
+    public function getCompletedSales(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $branchId = $user->restaurant_id; // Using restaurant_id as branch_id
+            
+            $query = WaPosCashSales::select([
+                'id',
+                'sales_no',
+                'customer',
+                'customer_phone_number',
+                'created_at',
+                'status',
+                'attending_cashier',
+                'branch_id'
+            ]);
+            
+            // Filter by branch if user has one
+            if ($branchId) {
+                $query->where('branch_id', $branchId);
+            }
+            
+            // Filter by date range if provided
+            if ($request->has('date_from') && $request->date_from) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+            
+            if ($request->has('date_to') && $request->date_to) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            } else {
+                // Default to last 7 days if no date specified
+                $query->whereDate('created_at', '>=', now()->subDays(7));
+            }
+            
+            $salesData = $query->orderBy('created_at', 'desc')
+                ->limit(100)
+                ->get();
+            
+            $sales = $salesData->map(function($sale) {
+                // Get items count and total
+                $items = WaPosCashSalesItems::where('wa_pos_cash_sales_id', $sale->id)->get();
+                $itemsCount = $items->count();
+                $grandTotal = $items->sum('total');
+                
+                // Get cashier name
+                $cashier = \App\User::find($sale->attending_cashier);
+                $cashierName = $cashier ? $cashier->name : 'N/A';
+                
+                // Get payment methods
+                $payments = WaPosCashSalesPayments::where('wa_pos_cash_sales_id', $sale->id)
+                    ->get()
+                    ->map(function($p) {
+                        $method = \App\Model\PaymentMethod::find($p->payment_method_id);
+                        return [
+                            'method' => $method ? $method->name : 'Cash',
+                            'amount' => (float) $p->amount
+                        ];
+                    });
+                
+                return [
+                    'id' => $sale->id,
+                    'sales_no' => $sale->sales_no,
+                    'date' => $sale->created_at->format('d M Y'),
+                    'time' => $sale->created_at->format('H:i'),
+                    'customer_name' => $sale->customer ?? 'Walk-in Customer',
+                    'customer_phone' => $sale->customer_phone_number,
+                    'cashier' => $cashierName,
+                    'items_count' => $itemsCount,
+                    'total_amount' => (float) $grandTotal,
+                    'payment_methods' => $payments,
+                    'can_return' => $sale->created_at->isToday(),
+                ];
+            });
+            
+            return response()->json([
+                'success' => true,
+                'sales' => $sales
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error loading completed sales: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
