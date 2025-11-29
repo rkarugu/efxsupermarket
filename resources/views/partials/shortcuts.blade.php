@@ -6,6 +6,7 @@
 
 </style>
 <input type="hidden" id="customer_fon" value="{{ @$data->customer_phone_number }}">
+<input type="hidden" id="customer_category_id" value="">
 <div id="pos_route_customer_create"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/pusher-js@7.0.3/dist/web/pusher.min.js"></script>
@@ -300,14 +301,26 @@
                         if (out.requestty === 'send_request') {
                             console.log('Print URL:', out.location);
                             var printWindow = window.open(out.location, 'PrintWindow', 'width=900,height=650');
-                            printWindow.focus();
-                            printWindow.onload = function() {
-                                printWindow.print();
-                                printWindow.onafterprint = function() {
-                                    printWindow.close();
+                            
+                            if (!printWindow || printWindow.closed || typeof printWindow.closed == 'undefined') {
+                                // Popup blocked
+                                console.error('❌ Receipt popup was blocked by browser');
+                                alert('Please allow popups for this site to print receipts.\n\nReceipt URL: ' + out.location);
+                                // Redirect after alert
+                                setTimeout(function() {
                                     location.href = '{{ route($model.'.index') }}';
+                                }, 1000);
+                            } else {
+                                console.log('✅ Receipt window opened successfully');
+                                printWindow.focus();
+                                printWindow.onload = function() {
+                                    printWindow.print();
+                                    printWindow.onafterprint = function() {
+                                        printWindow.close();
+                                        location.href = '{{ route($model.'.index') }}';
+                                    };
                                 };
-                            };
+                            }
                             return;
                         } else {
                             // For "save" action, redirect immediately without delay
@@ -1029,13 +1042,22 @@
     });
 
     if (furtherCall) {
+        // Get customer category for pricing
+        var customerCategoryId = $('#customer_category_id').val();
+        
         $.ajax({
             type: "GET",
             url: "{{ route('pos-cash-sales.getInventryItemDetails') }}",
             data: {
-                'id': $this.data('id')
+                'id': $this.data('id'),
+                'customer_category_id': customerCategoryId
             },
             success: function (data) {
+                // Show pricing tier indicator if category price is applied
+                var priceLabel = '';
+                if (data.category_price && data.category_name) {
+                    priceLabel = ` <span style="color: #1976d2; font-size: 11px;">(${data.category_name})</span>`;
+                }
                 var taxOption = data.tax ? `<option value="${data.tax.id}" selected>${data.tax.title}</option>` : '';
                 var newRow = `
                     <tr>
@@ -1049,7 +1071,10 @@
                         <td>${data.quantity_in_stock}</td>
                         <td><input style="padding: 3px 3px;" readonly type="text" name="item_unit[${data.id}]" class="form-control" value="${data.unit || ''}" readonly></td>
                         <td><input style="padding: 3px 3px;" autofocus onkeyup="getTotal(this)" onchange="getTotal(this)" type="text" name="item_quantity[${data.id}]" data-counts="${data.item_count}" class="quantity form-control" value=""></td>
-                        <td><input style="padding: 3px 3px;" ${data.edit_permission} onchange="getTotal(this)" onkeyup="getTotal(this)" readonly type="text" name="item_selling_price[${data.id}]" class="selling_price form-control send_me_to_next_item" value="${data.selling_price}"></td>
+                        <td>
+                            <input style="padding: 3px 3px;" ${data.edit_permission} onchange="getTotal(this)" onkeyup="getTotal(this)" readonly type="text" name="item_selling_price[${data.id}]" class="selling_price form-control send_me_to_next_item" value="${data.selling_price}">
+                            ${priceLabel}
+                        </td>
                         <td>
                             <select readonly class="form-control vat_list send_me_to_next_item" name="item_vat[${data.id}]" ${data.edit_permission}>${taxOption}</select>
                             <input type="hidden" class="vat_percentage" value="${data.tax_percentage}" name="item_vat_percentage[${data.id}]">
@@ -1360,8 +1385,53 @@
     };
     $(".route_customer").on('change', function (e) {
         var selectedData = $(".route_customer").select2('data')[0]; // Get the selected item
+        console.log('Customer selected:', selectedData);
+        
         if (selectedData) {
             $('#customer_fon').val(selectedData.phone);
+            
+            // Store customer category for pricing
+            if (selectedData.category_id) {
+                $('#customer_category_id').val(selectedData.category_id);
+                console.log('Customer category ID:', selectedData.category_id);
+                
+                // Show category pricing indicator
+                var categoryName = '';
+                switch(parseInt(selectedData.category_id)) {
+                    case 1:
+                        categoryName = 'Distribution';
+                        break;
+                    case 2:
+                        categoryName = 'Wholesale';
+                        break;
+                    case 3:
+                        categoryName = 'Retail';
+                        break;
+                    default:
+                        categoryName = 'Retail'; // Default fallback
+                }
+                
+                console.log('Category name:', categoryName);
+                
+                if (categoryName) {
+                    $('#pricing_tier_indicator').remove();
+                    $('.route_customer').parent().append(
+                        '<div id="pricing_tier_indicator" style="margin-top: 5px; padding: 5px 10px; background: #e3f2fd; border-radius: 4px; font-size: 12px; color: #1976d2;">' +
+                        '<i class="fa fa-tag"></i> <strong>' + categoryName + ' Pricing</strong>' +
+                        '</div>'
+                    );
+                    console.log('Pricing indicator added');
+                }
+            } else {
+                console.log('No category_id found for customer');
+                $('#customer_category_id').val('3'); // Default to Retail
+                $('#pricing_tier_indicator').remove();
+                $('.route_customer').parent().append(
+                    '<div id="pricing_tier_indicator" style="margin-top: 5px; padding: 5px 10px; background: #e3f2fd; border-radius: 4px; font-size: 12px; color: #1976d2;">' +
+                    '<i class="fa fa-tag"></i> <strong>Retail Pricing</strong>' +
+                    '</div>'
+                );
+            }
         }
     });
 </script>

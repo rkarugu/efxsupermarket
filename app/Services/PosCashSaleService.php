@@ -109,7 +109,10 @@ class PosCashSaleService
         WaPosCashSalesItems::where('wa_pos_cash_sales_id',$parent->id)->delete();
         foreach ($items as $item) {
 
-            $selling_price = $products->firstWhere('id', $item['item_id'])->selling_price;
+            // Use submitted selling price if provided (for category pricing), otherwise use product's selling price
+            $selling_price = isset($item['selling_price']) && $item['selling_price'] > 0 
+                ? $item['selling_price'] 
+                : $products->firstWhere('id', $item['item_id'])->selling_price;
             $promotion = ItemPromotion::where('inventory_item_id', $item['item_id'])
             ->where('status', 'active')
             ->where(function ($query) {

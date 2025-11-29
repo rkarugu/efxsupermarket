@@ -16,6 +16,7 @@ use App\Model\WaLocationAndStore;
 use App\Model\WaNumerSeriesCode;
 use App\Model\WaPosCashSalesItemReturns;
 use App\Model\WaUnitOfMeasure;
+use App\Model\WaCategoryItemPrice;
 use App\Models\CashDropTransaction;
 use App\Models\CashSaleEntry;
 use App\Models\HamperItem;
@@ -338,6 +339,27 @@ class PosCashSalesController extends Controller
             $per = $item->getTaxesOfItem->tax_value;
         }
 
+        // Get selling price based on customer category
+        $sellingPrice = $item->selling_price;
+        $categoryPrice = null;
+        $categoryName = null;
+        
+        if ($request->has('customer_category_id') && $request->customer_category_id) {
+            $categoryId = $request->customer_category_id;
+            $categoryItemPrice = WaCategoryItemPrice::where('item_id', $item->id)
+                ->where('category_id', $categoryId)
+                ->first();
+            
+            if ($categoryItemPrice && $categoryItemPrice->price) {
+                $categoryPrice = (float) $categoryItemPrice->price;
+                $sellingPrice = $categoryPrice;
+                
+                // Get category name
+                $category = \App\Model\WaCategory::find($categoryId);
+                $categoryName = $category ? $category->title : null;
+            }
+        }
+
         $data = [
             'id' => $item->id,
             'stock_id_code' => $item->stock_id_code,
@@ -346,7 +368,10 @@ class PosCashSalesController extends Controller
             'quantity_in_stock' => $item->quantity ?? 0,
             'unit' => $item->pack_size->title ?? null,
             'item_count' => $item->item_count,
-            'selling_price' => $item->selling_price,
+            'selling_price' => $sellingPrice,
+            'standard_price' => $item->selling_price,
+            'category_price' => $categoryPrice,
+            'category_name' => $categoryName,
             'tax' => $item->getTaxesOfItem ? ['id' => $item->getTaxesOfItem->id, 'title' => $item->getTaxesOfItem->title] : null,
             'tax_percentage' => $per,
             'edit_permission' => $editPermission,
@@ -565,6 +590,7 @@ class PosCashSalesController extends Controller
                         "item_id" => (int) $itemId,
                         "item_quantity" => (float) $request->item_quantity[$id],
                         "item_discount_amount" => (float) $request->item_discount[$id],
+                        "selling_price" => (float) $request->item_selling_price[$id],
                     ];
                 }
                 $payment_methods = [];
@@ -3155,6 +3181,99 @@ class PosCashSalesController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error processing return: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get returns/credit notes for supermarket POS
+     */
+    public function getReturns(Request $request)
+    {
+        try {
+            $user = Auth::user();
+            $branchId = $user->restaurant_id;
+            
+            // Build query for returns
+            $query = WaPosCashSalesItemReturns::select([
+                'wa_pos_cash_sales_items_return.id',
+                'wa_pos_cash_sales_items_return.return_grn',
+                'wa_pos_cash_sales_items_return.wa_pos_cash_sales_id',
+                'wa_pos_cash_sales_items_return.return_date',
+                'wa_pos_cash_sales_items_return.return_by',
+                DB::raw('SUM(wa_pos_cash_sales_items_return.return_quantity * wa_pos_cash_sales_items.selling_price) as total_return_amount'),
+                DB::raw('COUNT(wa_pos_cash_sales_items_return.id) as items_count')
+            ])
+            ->join('wa_pos_cash_sales_items', 'wa_pos_cash_sales_items_return.wa_pos_cash_sales_item_id', '=', 'wa_pos_cash_sales_items.id')
+            ->join('wa_pos_cash_sales', 'wa_pos_cash_sales_items_return.wa_pos_cash_sales_id', '=', 'wa_pos_cash_sales.id')
+            ->groupBy('wa_pos_cash_sales_items_return.return_grn');
+            
+            // Filter by branch if user has one
+            if ($branchId) {
+                $query->where('wa_pos_cash_sales.branch_id', $branchId);
+            }
+            
+            // Filter by date range if provided
+            if ($request->has('date_from') && $request->date_from) {
+                $query->whereDate('wa_pos_cash_sales_items_return.return_date', '>=', $request->date_from);
+            }
+            
+            if ($request->has('date_to') && $request->date_to) {
+                $query->whereDate('wa_pos_cash_sales_items_return.return_date', '<=', $request->date_to);
+            } else {
+                // Default to last 30 days if no date specified
+                $query->whereDate('wa_pos_cash_sales_items_return.return_date', '>=', now()->subDays(30));
+            }
+            
+            $returnsData = $query->orderBy('wa_pos_cash_sales_items_return.return_date', 'desc')
+                ->limit(100)
+                ->get();
+            
+            $returns = $returnsData->map(function($return) {
+                // Get the sale details
+                $sale = WaPosCashSales::find($return->wa_pos_cash_sales_id);
+                
+                // Get the user who processed the return
+                $returnedBy = \App\User::find($return->return_by);
+                
+                // Get return items with reasons
+                $returnItems = WaPosCashSalesItemReturns::with(['saleItem.item', 'returnReason'])
+                    ->where('return_grn', $return->return_grn)
+                    ->get()
+                    ->map(function($item) {
+                        return [
+                            'item_name' => $item->saleItem->item->title ?? 'N/A',
+                            'quantity' => $item->return_quantity,
+                            'reason' => $item->returnReason->reason ?? 'N/A'
+                        ];
+                    });
+                
+                return [
+                    'id' => $return->id,
+                    'return_grn' => $return->return_grn,
+                    'sale_no' => $sale->sales_no ?? 'N/A',
+                    'return_date' => \Carbon\Carbon::parse($return->return_date)->format('d M Y'),
+                    'return_time' => \Carbon\Carbon::parse($return->return_date)->format('H:i'),
+                    'customer_name' => $sale->customer ?? 'Walk-in Customer',
+                    'returned_by' => $returnedBy->name ?? 'N/A',
+                    'items_count' => $return->items_count,
+                    'total_return_amount' => (float) $return->total_return_amount,
+                    'items' => $returnItems
+                ];
+            });
+            
+            return response()->json([
+                'success' => true,
+                'returns' => $returns
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error loading returns: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error loading returns: ' . $e->getMessage()
             ], 500);
         }
     }

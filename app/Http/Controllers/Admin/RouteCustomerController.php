@@ -60,7 +60,9 @@ class RouteCustomerController extends Controller
                 })
                 ->select(
                     'id',
-                    DB::raw('CONCAT(name, " --- ", phone) AS title'),  'phone')
+                    DB::raw('CONCAT(name, " --- ", phone) AS title'),  
+                    'phone',
+                    'category_id')
                 ->take(5)
                 ->get();
             return response()->json($results);

@@ -430,6 +430,28 @@
         border: 1px solid #e0e6ed;
     }
 
+    /* Completed Sales & Returns Sections */
+    #completed-section,
+    #returns-section {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #completed-section > div,
+    #returns-section > div {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #completed-sales-list,
+    #returns-list {
+        flex: 1;
+        overflow-y: auto;
+    }
+
     /* Completed Sales Styles */
     .completed-sale-card {
         background: #fff;
@@ -575,6 +597,9 @@
                 <button class="btn-modern btn-modern-secondary" id="btn-completed" onclick="showCompletedSales()">
                     <i class="fa fa-check-circle"></i> Completed
                 </button>
+                <button class="btn-modern btn-modern-secondary" id="btn-returns" onclick="showReturns()">
+                    <i class="fa fa-undo"></i> Returns
+                </button>
                 <button class="btn-modern btn-modern-secondary" onclick="viewPending()">
                     <i class="fa fa-clock"></i> Pending
                 </button>
@@ -629,6 +654,25 @@
                 </div>
                 <div id="completed-sales-list">
                     <!-- Completed sales will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Returns/Credit Notes Section (Hidden by default) -->
+        <div class="pos-products" id="returns-section" style="display: none;">
+            <div style="padding: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;"><i class="fa fa-undo"></i> Returns / Credit Notes</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="date" id="returns-date-from" class="form-control" style="display: inline-block; width: auto;" placeholder="From Date">
+                        <input type="date" id="returns-date-to" class="form-control" style="display: inline-block; width: auto;" placeholder="To Date">
+                        <button class="btn btn-primary" onclick="loadReturns()">
+                            <i class="fa fa-search"></i> Search
+                        </button>
+                    </div>
+                </div>
+                <div id="returns-list">
+                    <!-- Returns will be loaded here -->
                 </div>
             </div>
         </div>
@@ -737,4 +781,5 @@
 <script src="{{asset('js/sweetalert.js')}}"></script>
 <script src="{{asset('js/supermarket-pos.js')}}?v={{time()}}"></script>
 <script src="{{asset('js/supermarket-pos-completed.js')}}?v={{time()}}"></script>
+<script src="{{asset('js/supermarket-pos-returns.js')}}?v={{time()}}"></script>
 @endsection
