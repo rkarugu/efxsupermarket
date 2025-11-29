@@ -405,6 +405,7 @@
                 $logged_user_info->role_id == 1 ||
                     isset($my_permissions['pos-cash-sales-new___view']) ||
                     isset($my_permissions['pos-cash-sales___view']) ||
+                    isset($my_permissions['pos-supermarket___view']) ||
                     isset($my_permissions['cashier-management___transactions']) ||
                     isset($my_permissions['cashier-management___transactions']) ||
                     isset($my_permissions['cashier-management___view']) ||
@@ -413,6 +414,7 @@
                 <li class="treeview @if (isset($model) &&
                         ($model == 'pos-cash-sales-new' ||
                             $model == 'pos-cash-sales' ||
+                            $model == 'pos-supermarket' ||
                             $model == 'dispatch-progress' ||
                             $model == 'cashier-management' ||
                             $model == 'cashier-management-show' ||
@@ -437,6 +439,10 @@
                             <li class="@if (isset($model) && $model == 'pos-cash-sales') active @endif"><a
                                     href="{!! route('pos-cash-sales.index') . getReportDefaultFilterForTrialBalance() !!}"><i class="fa fa-circle"></i>POS Cash
                                     Sales</a></li>
+                        @endif
+                        @if ($logged_user_info->role_id == 1 || isset($my_permissions['pos-supermarket___view']))
+                            <li class="@if (isset($model) && $model == 'pos-supermarket') active @endif"><a
+                                    href="{!! route('pos-cash-sales.supermarket') !!}"><i class="fa fa-circle"></i>POS Supermarket</a></li>
                         @endif
                         @if ($logged_user_info->role_id == 1 || isset($my_permissions['pos-cash-sales___dispatch-progress']))
                             <li class="@if (isset($model) && $model == 'dispatch-progress') active @endif">

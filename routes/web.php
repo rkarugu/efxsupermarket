@@ -862,6 +862,9 @@ Route::any('/admin/pos/route-customer/store', [CustomerController::class, 'store
     Route::get('pos-cash-sales/supermarket/cashier-info', 'PosCashSalesController@getCashierInfo')->name('pos-cash-sales.supermarket.cashier-info');
     Route::get('pos-cash-sales/supermarket/receipt/{id}', 'PosCashSalesController@printSupermarketReceipt')->name('pos-cash-sales.supermarket.receipt');
     Route::get('pos-cash-sales/supermarket/completed', 'PosCashSalesController@getCompletedSales')->name('pos-cash-sales.supermarket.completed');
+    Route::get('pos-cash-sales/supermarket/return/{id}', 'PosCashSalesController@supermarketReturnItems')->name('pos-cash-sales.supermarket.return');
+    Route::post('pos-cash-sales/supermarket/return/{id}', 'PosCashSalesController@supermarketReturnItemsPost')->name('pos-cash-sales.supermarket.return.post');
+    Route::get('pos-cash-sales/supermarket/return-receipt/{returnGrn}', 'PosCashSalesController@printSupermarketReturnReceipt')->name('pos-cash-sales.supermarket.return.receipt');
 
     Route::resource('pos-cash-sales', 'PosCashSalesController')->middleware('branch-close');
 

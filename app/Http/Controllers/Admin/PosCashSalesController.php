@@ -2382,10 +2382,10 @@ class PosCashSalesController extends Controller
         $permission = $this->mypermissionsforAModule();
         $pmodule = $this->pmodule;
         $title = $this->title;
-        $model = $this->model;
+        $model = 'pos-supermarket'; // Set specific model name for sidebar highlighting
 
         if (isset($permission[$pmodule . '___add']) || $permission == 'superadmin') {
-            $breadcum = [$title => route($model . '.index'), 'Create' => ''];
+            $breadcum = [$title => route('pos-cash-sales.index'), 'POS Supermarket' => ''];
             
             // Get payment methods
             $paymentMethod = PaymentMethod::where('use_in_pos', 1)->get();
@@ -2911,6 +2911,320 @@ class PosCashSalesController extends Controller
                 'success' => false,
                 'message' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Get sale details for return (Supermarket POS)
+     */
+    public function supermarketReturnItems($id)
+    {
+        try {
+            $user = getLoggeduserProfile();
+            $permission = $this->mypermissionsforAModule();
+            
+            if (!isset($permission[$this->pmodule . '___return']) && $permission != 'superadmin') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to process returns'
+                ], 403);
+            }
+            
+            // Get sale with items (no store_location_id filter for supermarket POS)
+            $sale = WaPosCashSales::with([
+                'items' => function($query) {
+                    $query->where(function($q) {
+                        $q->where('is_return', 0)
+                          ->orWhereNull('is_return');
+                    });
+                },
+                'items.item',
+                'items.item.pack_size'
+            ])
+            ->where('id', $id)
+            ->where('status', 'Completed')
+            ->first();
+            
+            if (!$sale || $sale->items->count() == 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No items available for return'
+                ], 404);
+            }
+            
+            // Get return reasons
+            $reasons = ReturnReason::where('use_for_pos', 1)->get();
+            
+            // Calculate total amount from items
+            $totalAmount = $sale->items->sum('total');
+            
+            // Format items for return
+            $items = $sale->items->map(function($item) {
+                $inventoryItem = $item->item;
+                return [
+                    'id' => $item->id,
+                    'item_id' => $item->wa_inventory_item_id,
+                    'item_name' => $inventoryItem ? ($inventoryItem->title ?? $inventoryItem->item_name ?? 'Unknown Item') : 'Unknown Item',
+                    'stock_id_code' => $inventoryItem ? $inventoryItem->stock_id_code : '',
+                    'qty' => (float) $item->qty,
+                    'selling_price' => (float) $item->selling_price,
+                    'total' => (float) $item->total,
+                    'pack_size' => ($inventoryItem && $inventoryItem->pack_size) ? $inventoryItem->pack_size->pack_size_name : 'N/A',
+                ];
+            });
+            
+            return response()->json([
+                'success' => true,
+                'sale' => [
+                    'id' => $sale->id,
+                    'sales_no' => $sale->sales_no,
+                    'date' => $sale->created_at->format('d M Y'),
+                    'time' => $sale->created_at->format('H:i'),
+                    'total_amount' => (float) $totalAmount,
+                ],
+                'items' => $items,
+                'reasons' => $reasons
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error loading return items: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error loading return items: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Process return items (Supermarket POS)
+     */
+    public function supermarketReturnItemsPost($id, Request $request)
+    {
+        try {
+            $user = getLoggeduserProfile();
+            $permission = $this->mypermissionsforAModule();
+            
+            if (!isset($permission[$this->pmodule . '___return']) && $permission != 'superadmin') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You do not have permission to process returns'
+                ], 403);
+            }
+            
+            // Validate request
+            $validator = \Validator::make($request->all(), [
+                'items' => 'required|array|min:1',
+                'items.*.item_id' => 'required|exists:wa_pos_cash_sales_items,id',
+                'items.*.quantity' => 'required|numeric|min:0.01',
+                'items.*.reason_id' => 'required|exists:return_reasons,id',
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+            
+            DB::beginTransaction();
+            
+            // Get the sale (no store_location_id filter for supermarket POS)
+            $sale = WaPosCashSales::with([
+                'items' => function($query) {
+                    $query->where(function($q) {
+                        $q->where('is_return', 0)
+                          ->orWhereNull('is_return');
+                    });
+                },
+                'items.item'
+            ])
+            ->where('id', $id)
+            ->where('status', 'Completed')
+            ->first();
+            
+            if (!$sale) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Sale not found or not eligible for return'
+                ], 404);
+            }
+            
+            // Generate return GRN number
+            $returnGrn = getCodeWithNumberSeries('RETURN');
+            updateUniqueNumberSeries('RETURN', $returnGrn);
+            
+            $dateTime = now();
+            $returns = [];
+            $totalReturnAmount = 0;
+            
+            foreach ($request->items as $returnItem) {
+                $saleItem = $sale->items->firstWhere('id', $returnItem['item_id']);
+                
+                if (!$saleItem) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid item in return request'
+                    ], 400);
+                }
+                
+                $returnQty = $returnItem['quantity'];
+                
+                // Validate quantity
+                if ($returnQty > $saleItem->qty) {
+                    DB::rollBack();
+                    $itemName = $saleItem->item->title ?? $saleItem->item->item_name ?? 'this item';
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Return quantity cannot exceed sold quantity for {$itemName}"
+                    ], 400);
+                }
+                
+                // Calculate new quantity after return
+                $newQty = $saleItem->qty - $returnQty;
+                $returnAmount = $returnQty * $saleItem->selling_price;
+                $totalReturnAmount += $returnAmount;
+                
+                // Update the original sale item
+                WaPosCashSalesItems::where('id', $saleItem->id)->update([
+                    'return_by' => $user->id,
+                    'is_return' => 1,
+                    'return_grn' => $returnGrn,
+                    'return_date' => $dateTime,
+                    'original_quantity' => $saleItem->qty,
+                    'return_quantity' => $returnQty,
+                    'qty' => $newQty,
+                    'total' => $newQty * $saleItem->selling_price
+                ]);
+                
+                // Create return record
+                $returns[] = [
+                    'wa_pos_cash_sales_item_id' => $saleItem->id,
+                    'wa_pos_cash_sales_id' => $sale->id,
+                    'return_by' => $user->id,
+                    'return_grn' => $returnGrn,
+                    'return_quantity' => $returnQty,
+                    'reason_id' => $returnItem['reason_id'],
+                    'return_date' => $dateTime,
+                    'created_at' => $dateTime,
+                    'updated_at' => $dateTime,
+                ];
+                
+                // Create stock movement (return stock back to inventory)
+                // Use user's store location for supermarket POS returns
+                WaStockMove::create([
+                    'wa_inventory_item_id' => $saleItem->wa_inventory_item_id,
+                    'wa_location_and_store_id' => $user->wa_location_and_store_id,
+                    'restaurant_id' => $user->restaurant_id,
+                    'qauntity' => $returnQty,
+                    'document_no' => $returnGrn,
+                    'refrence' => 'SUPERMARKET POS RETURN - ' . $returnGrn,
+                    'user_id' => $user->id,
+                    'stock_id_code' => $saleItem->item->stock_id_code,
+                    'price' => $saleItem->selling_price,
+                    'selling_price' => $saleItem->selling_price,
+                    'standard_cost' => $saleItem->item->standard_cost ?? 0,
+                    'total_cost' => $saleItem->selling_price * $returnQty,
+                    'created_at' => $dateTime,
+                    'updated_at' => $dateTime,
+                ]);
+            }
+            
+            // Insert return records
+            if (!empty($returns)) {
+                WaPosCashSalesItemReturns::insert($returns);
+            }
+            
+            DB::commit();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Return processed successfully',
+                'return_grn' => $returnGrn,
+                'return_amount' => $totalReturnAmount
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Supermarket POS Return Error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error processing return: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Print return receipt for supermarket POS
+     */
+    public function printSupermarketReturnReceipt($returnGrn)
+    {
+        try {
+            \Log::info('Attempting to print return receipt for GRN: ' . $returnGrn);
+            
+            $user = getLoggeduserProfile();
+            
+            // Get return records by GRN
+            $returnRecords = WaPosCashSalesItemReturns::with([
+                'saleItem',
+                'saleItem.item',
+                'returnReason'
+            ])
+            ->where('return_grn', $returnGrn)
+            ->get();
+            
+            \Log::info('Found ' . $returnRecords->count() . ' return records');
+            
+            if ($returnRecords->count() == 0) {
+                \Log::error('No return records found for GRN: ' . $returnGrn);
+                return response()->view('errors.404', ['message' => 'Return receipt not found. GRN: ' . $returnGrn], 404);
+            }
+            
+            // Get the sale
+            $sale = WaPosCashSales::find($returnRecords->first()->wa_pos_cash_sales_id);
+            
+            if (!$sale) {
+                \Log::error('Original sale not found for return GRN: ' . $returnGrn);
+                return response()->view('errors.404', ['message' => 'Original sale not found'], 404);
+            }
+            
+            // Get the user who processed the return
+            $processedBy = \App\User::find($returnRecords->first()->return_by);
+            
+            // Format return items for the view
+            $returnItems = $returnRecords->map(function($record) {
+                return [
+                    'sale_item' => $record->saleItem,
+                    'quantity' => $record->return_quantity,
+                    'reason' => $record->returnReason
+                ];
+            });
+            
+            // Convert return_date to Carbon instance if it's a string
+            $returnDate = $returnRecords->first()->return_date;
+            if (is_string($returnDate)) {
+                $returnDate = \Carbon\Carbon::parse($returnDate);
+            }
+            
+            \Log::info('Successfully prepared return receipt data');
+            
+            return view('admin.pos_cash_sales.supermarket_return_receipt', compact(
+                'returnGrn',
+                'sale',
+                'returnItems',
+                'returnDate',
+                'processedBy'
+            ));
+            
+        } catch (\Exception $e) {
+            \Log::error('Error printing return receipt: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->view('errors.500', ['message' => 'Error generating return receipt: ' . $e->getMessage()], 500);
         }
     }
 }
